@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OrchestAI - The Intelligent Agent Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Landing Page Specific Overrides */
+        body { overflow: auto; display: block; height: auto; }
+        .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; position: relative; }
+        .nav-header { position: absolute; top: 0; width: 100%; padding: 20px 50px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .hero-title { font-size: 4.5rem; font-weight: 900; margin-bottom: 20px; text-shadow: 0 0 40px rgba(102, 252, 241, 0.4); }
+        .hero-subtitle { font-size: 1.2rem; color: var(--text-main); max-width: 600px; margin-bottom: 40px; line-height: 1.6; }
+        .cta-group { display: flex; gap: 20px; }
+        .btn-primary { background: rgba(102, 252, 241, 0.2); border: 1px solid var(--primary-neon); color: var(--primary-neon); padding: 15px 30px; font-size: 1.1rem; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.3s; box-shadow: 0 0 20px rgba(102,252,241,0.2); }
+        .btn-primary:hover { background: var(--primary-neon); color: #000; box-shadow: 0 0 40px rgba(102,252,241,0.6); }
+        .btn-secondary { background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-light); padding: 15px 30px; font-size: 1.1rem; text-decoration: none; border-radius: 8px; font-weight: 500; transition: all 0.3s; backdrop-filter: blur(10px); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: #fff; }
+        
+        /* Glassmorphic Feature Cards */
+        .features-section { padding: 100px 20px; max-width: 1200px; margin: 0 auto; }
+        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 50px; }
+        .feature-card { background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 40px; border-radius: 20px; backdrop-filter: blur(16px); transition: transform 0.3s; }
+        .feature-card:hover { transform: translateY(-10px); border-color: var(--primary-neon); }
+        .feature-icon { font-size: 2.5rem; color: var(--primary-neon); margin-bottom: 20px; }
+        .feature-card h3 { font-size: 1.5rem; margin-bottom: 15px; color: var(--text-light); }
+        .feature-card p { color: var(--text-main); line-height: 1.6; }
+    </style>
+</head>
+<body>
+
+    <div class="glass-background">
+        <div class="blob blob-1" style="top: -20%; left: -10%; width: 600px; height: 600px;"></div>
+        <div class="blob blob-2" style="bottom: 10%; right: -10%; width: 500px; height: 500px;"></div>
+        <div class="blob blob-3" style="top: 50%; left: 50%; transform: translate(-50%, -50%); width: 800px; height: 800px; opacity: 0.2;"></div>
+    </div>
+
+    <header class="nav-header">
+        <div class="brand">
+            <i class="fa-solid fa-microchip neon-icon icon-lg"></i>
+            <h2>OrchestAI</h2>
+        </div>
+        <div class="nav-links">
+            <a href="/login" class="btn-secondary" style="padding: 10px 20px; font-size: 0.9rem;">Sign In</a>
+        </div>
+    </header>
+
+    <section class="hero">
+        <h1 class="hero-title slide-in">Next-Gen Agent Orchestration</h1>
+        <p class="hero-subtitle fade-in-up" style="animation-delay: 0.2s;">
+            Power your workflow with our advanced Semantic LLM Router. Let intelligent agents research, synthesize, and execute your complex commands seamlessly.
+        </p>
+        <div class="cta-group fade-in-up" style="animation-delay: 0.4s;">
+            <a href="/register" class="btn-primary">Get Started <i class="fa-solid fa-arrow-right" style="margin-left: 8px;"></i></a>
+            <a href="#features" class="btn-secondary">Explore Architecture</a>
+        </div>
+    </section>
+
+    <section id="features" class="features-section">
+        <div style="text-align: center; margin-bottom: 60px;">
+            <h2 style="font-size: 2.5rem; color: var(--text-light);">Why choose OrchestAI?</h2>
+            <p style="color: var(--primary-neon); margin-top: 10px; letter-spacing: 2px; text-transform: uppercase; font-size: 0.9rem;">Powered by Llama 3 & LangChain</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <i class="fa-solid fa-route feature-icon"></i>
+                <h3>Semantic Routing</h3>
+                <p>Omit brittle if/else statements. Our native Llama-3-8b Supervisor Agent interprets your intent and dynamically routes tasks to the correct pipeline.</p>
+            </div>
+            
+            <div class="feature-card">
+                <i class="fa-solid fa-network-wired feature-icon"></i>
+                <h3>Multi-Agent Execution</h3>
+                <p>Deploy specialized chains including Research, Deep Analytics, and Draft Formatting agents working in absolute unison to provide structured responses.</p>
+            </div>
+            
+            <div class="feature-card">
+                <i class="fa-solid fa-laptop-code feature-icon"></i>
+                <h3>Glassmorphic UI</h3>
+                <p>Interact with your agents via a stunning, professionally designed frontend. Features voice dictation, smart chat history, and fluid Apple-like aesthetics.</p>
+            </div>
+        </div>
+    </section>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

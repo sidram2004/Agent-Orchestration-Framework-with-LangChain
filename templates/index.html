@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Orchestration Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="glass-background">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <!-- Theme Toggle Floating -->
+    <button id="theme-toggle" class="glass-btn theme-btn floating-tr"><i class="fa-solid fa-moon"></i> Theme</button>
+
+    <div class="app-container glass-panel">
+        
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="fa-solid fa-microchip neon-icon icon-lg"></i>
+                <h2>OrchestAI</h2>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-title">Workspaces</div>
+                <button class="menu-btn active" id="btn-new-chat"><i class="fa-solid fa-plus"></i> New Workspace</button>
+                <button class="menu-btn" onclick="document.getElementById('pdf-upload').click()">
+                    <i class="fa-solid fa-file-pdf"></i> Upload Context
+                </button>
+                <input type="file" id="pdf-upload" hidden>
+            </div>
+
+            <div class="sidebar-section recent-chats fade-in-up">
+                <div class="section-title">History</div>
+                <!-- Dynamic List -->
+                <div id="chat-history-list">
+                    {% for c in chat_list %}
+                    <a href="/chat?chat_id={{c}}" style="text-decoration:none; color:inherit;">
+                    <div class="chat-item {{ 'active' if c == current_chat else '' }}" data-chat-id="{{ c }}">
+                        <i class="fa-regular fa-message"></i>
+                        <span>{{ c }}</span>
+                        <i class="fa-solid fa-trash delete-chat hover-red" onclick="event.preventDefault(); window.location.href='/delete_chat/{{c}}'"></i>
+                    </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="menu-btn" id="btn-settings"><i class="fa-solid fa-gear"></i> Settings</button>
+                <button class="menu-btn danger-text" onclick="window.location.href='/logout'"><i class="fa-solid fa-power-off"></i> Disconnect</button>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard -->
+        <main class="chat-area">
+            <header class="chat-header">
+                <h3><i class="fa-solid fa-network-wired"></i> Workflow Execution</h3>
+                <div class="header-actions">
+                    <span class="status-badge"><span class="dot pulse"></span> Multi-Agent Online</span>
+                    <button class="glass-btn" id="btn-export" title="Export to PDF/TXT"><i class="fa-solid fa-file-export"></i></button>
+                </div>
+            </header>
+
+            <div class="chat-flow" id="chat-flow">
+                <!-- Welcome Message -->
+                <div class="message ai-message slide-in">
+                    <div class="avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="message-content glass-pill">
+                        <p>Welcome to OrchestAI Workspace.</p>
+                        <p>I am online and ready to orchestrate your tasks. You can use voice dictation using the microphone icon below, or toggle my settings using the gear icon on the left.</p>
+                    </div>
+                </div>
+                
+                {% for row in history %}
+                <!-- USER -->
+                <div class="message user-message slide-in">
+                    <div class="avatar user-avatar"><i class="fa-solid fa-user-astronaut"></i></div>
+                    <div class="message-content glass-pill"><p>{{ row.message }}</p></div>
+                </div>
+                <!-- AI -->
+                <div class="message ai-message slide-in">
+                    <div class="avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="message-content glass-pill">
+                        <p>{{ row.response }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-container glass-panel-inner">
+                <form id="chat-form" class="input-form">
+                    <input type="hidden" id="chat_id" value="{{ current_chat }}">
+                    <button type="button" class="action-btn" id="voice-btn" title="Voice Dictation (Web Speech)"><i class="fa-solid fa-microphone"></i></button>
+                    <input type="text" id="user-msg" placeholder="Command the orchestration agents..." autocomplete="off">
+                    <button type="submit" class="action-btn send-btn" id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- Agent Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-sliders"></i> Agent Configuration</h3>
+                <button class="close-btn" id="close-settings"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-row">
+                    <span>Web Search Access</span>
+                    <label class="switch">
+                        <input type="checkbox" checked id="toggle-search">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <span>Advanced Analytics Engine</span>
+                    <label class="switch">
+                        <input type="checkbox" checked id="toggle-analytics">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <!-- Mock Slider for Temp -->
+                <div style="margin-top: 20px;">
+                    <span style="font-size: 0.9rem; color: #888;">AI Temperature (Creativity)</span>
+                    <input type="range" min="1" max="100" value="20" style="width: 100%; margin-top: 10px;" id="temp-slider">
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Template for Agent Steps (Hidden by Default) -->
+    <template id="agent-steps-template">
+        <div class="agent-trace slide-in">
+            <div class="trace-header">Executing Agent Pipeline...</div>
+            <ul class="trace-list">
+                <li class="step step-routing"><i class="fa-solid fa-route"></i> Supervisor routing task...</li>
+                <li class="step step-research"><i class="fa-solid fa-magnifying-glass"></i> Research Agent gathering data...</li>
+                <li class="step step-analysis"><i class="fa-solid fa-chart-pie"></i> Analysis Agent synthesizing...</li>
+                <li class="step step-email"><i class="fa-solid fa-envelope"></i> Email Agent formatting draft...</li>
+            </ul>
+        </div>
+    </template>
+
+    <template id="email-card-template">
+        <div class="email-card glass-card slide-in">
+            <div class="email-header">
+                <div><i class="fa-solid fa-envelope-open-text neon-icon"></i> Drafted Communication</div>
+                <button class="copy-btn"><i class="fa-regular fa-copy"></i> Copy</button>
+            </div>
+            <div class="email-body"></div>
+        </div>
+    </template>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

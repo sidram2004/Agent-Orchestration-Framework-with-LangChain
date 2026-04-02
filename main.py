@@ -1,66 +1,58 @@
-from langchain_groq import ChatGroq
-from langchain.agents import initialize_agent, Tool
-from dotenv import load_dotenv
-from tools import calculator, weather_api
-import os
 
-# Load environment variables
-load_dotenv()
+from agents import create_agents
+from memory import create_shared_memory
 
-# Initialize LLM (Groq hosted model)
-llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    temperature=0.7
-)
+research, analysis, summarizer = create_agents()
+shared_memory = create_shared_memory()
 
-#  Tools
-# def calculator(query):
-#     try:
-#         return str(eval(query))
-#     except:
-#         return "Invalid math expression"
+print("\nMulti-Agent System Ready")
+print("Type 'exit' to stop\n")
 
-tools = [
-    Tool(
-        name="Calculator",
-        func=calculator,
-        description="Useful for solving math problems"
-    ),
-    Tool(
-        name="Weather",
-        func=weather_api,
-        description="Use this tool to get weather information for any city"
-    )
-]
-
-# Create agent
-agent = initialize_agent(
-    tools,
-    llm,
-    agent="zero-shot-react-description",
-    verbose=True
-)
-
-print("\nLangChain Agent Ready! Type exit to stop.")
-
-#Console interface
 while True:
+
     user_input = input("You: ")
 
     if user_input.lower() == "exit":
-        print("Goodbye!")
+        print("System stopped")
         break
 
-    # response = agent.run(user_input)
-    # print("AI:", response)
-    
     try:
-        response = agent.invoke(user_input)
-        print("AI:", response["output"])
+        # 🔹 Load memory properly
+        memory_data = shared_memory.load_memory_variables({"input": user_input})
+        history = memory_data.get("history", "")
+
+        # 🔹 Combine memory + input
+        combined_input = f"""
+Previous Context:
+{history}
+
+User Query:
+{user_input}
+"""
+
+        #  Research Agent
+        research_result = research.invoke({"input": combined_input})
+        research_output = research_result["output"]
+
+        #  Analysis Agent
+        analysis_result = analysis.invoke({"input": research_output})
+        analysis_output = analysis_result["text"]
+
+        #  Summarizer Agent
+        final_result = summarizer.invoke({"input": analysis_output})
+        final_output = final_result["text"]
+
+        #  Store useful memory
+        shared_memory.save_context(
+            {"input": user_input},
+            {"output": research_output}
+        )
+
+        # Final clean output
+        print("\nAI:", final_output)
 
     except Exception as e:
-        print("Error:", e)
-
+        print("Error:", str(e))
 
 
 
