@@ -29,11 +29,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalSettings = document.getElementById('settings-modal');
     const btnCloseSettings = document.getElementById('close-settings');
 
-    if(btnSettings) {
+    if (btnSettings) {
         btnSettings.addEventListener('click', () => { modalSettings.classList.add('show'); });
         btnCloseSettings.addEventListener('click', () => { modalSettings.classList.remove('show'); });
         modalSettings.addEventListener('click', (e) => {
-            if(e.target === modalSettings) modalSettings.classList.remove('show');
+            if (e.target === modalSettings) modalSettings.classList.remove('show');
         });
     }
 
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newId = `Chat ${Date.now().toString().slice(-4)}`;
         // Clear chat area logically
         document.querySelectorAll('.message:not(.slide-in)').forEach(el => el.remove());
-        
+
         // Add To Sidebar
         const newItem = document.createElement('div');
         newItem.className = 'chat-item active';
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>Workspace ${newId}</span>
             <i class="fa-solid fa-trash delete-chat hover-red"></i>
         `;
-        
+
         // Deactivate others
         document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
         chatHistoryList.prepend(newItem);
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnExport.addEventListener('click', () => {
             let exportText = "# AI Orchestration Execution Log\n\n";
             const messages = chatFlow.querySelectorAll('.glass-pill');
-            
+
             messages.forEach(msgNode => {
                 const isAI = msgNode.parentElement.classList.contains('ai-message');
                 exportText += isAI ? "### OrchestAI:\n" : "### User Query:\n";
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const msg = userInput.value.trim();
-        if(!msg) return;
+        if (!msg) return;
 
         addUserMessage(msg);
         userInput.value = '';
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('chat_id', currentChatId);
             formData.append('message', msg);
-            
+
             const pdfInput = document.getElementById('pdf-upload');
             if (pdfInput.files.length > 0) formData.append('pdf', pdfInput.files[0]);
 
@@ -161,11 +161,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             setTimeout(() => {
                 finishStep(steps[1]);
-                if(data.email && data.email.trim() !== "") {
+                // Inject tools inline inside trace, under Research step
+                if (data.tools_used && data.tools_used.length > 0) {
+                    injectToolsInTrace(traceBlock, data.tools_used);
+                }
+                if (data.email && data.email.trim() !== "") {
                     activateStep(steps[2]);
                     setTimeout(() => { finishStep(steps[2]); activateStep(steps[3]); }, 800);
-                    setTimeout(() => { 
-                        finishStep(steps[3]); 
+                    setTimeout(() => {
+                        finishStep(steps[3]);
                         addAiResponse(data.response);
                         addEmailCard(data.email);
                         scrollToBottom();
@@ -185,11 +189,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 finishStep(steps[1]);
                 steps[2].style.display = 'none';
                 steps[3].style.display = 'none';
-                
+
                 // Demo markdown parsing
                 const testMarkdown = `**I cannot reach your Python backend server.** Please verify \`app.py\` is running via:
                 \n\`\`\`bash\npython app.py\n\`\`\`\n\nI received your query though: "${msg}"`;
-                
+
                 addAiResponse(testMarkdown);
                 scrollToBottom();
             }, 1500);
@@ -231,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         div.className = 'message ai-message slide-in';
         // Parse markdown -> HTML securely
         const parsedHTML = typeof marked !== 'undefined' ? marked.parse(markdownText) : markdownText;
-        
+
         div.innerHTML = `
             <div class="avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>
             <div class="message-content glass-pill">
@@ -241,12 +245,31 @@ document.addEventListener('DOMContentLoaded', () => {
         chatFlow.appendChild(div);
     }
 
+    // Injects a single summary line of unique tools used inside the trace block
+    function injectToolsInTrace(traceBlock, tools) {
+        const list = traceBlock.querySelector('.trace-list');
+        const researchStep = list.querySelector('.step-research');
+
+        // Deduplicate — only show each tool name once
+        const uniqueTools = [...new Map(tools.map(t => [t.tool, t])).values()];
+
+        const li = document.createElement('li');
+        li.className = 'step step-tool-inline slide-in done';
+        const toolNames = uniqueTools.map(t =>
+            `<span class="tool-inline-name"><i class="fa-solid fa-wrench tool-icon-inline"></i> ${t.tool}</span>`
+        ).join(' &nbsp;|&nbsp; ');
+        li.innerHTML = `🛠️ Tools used: ${toolNames}`;
+
+        // Insert once, right after the research step
+        researchStep.insertAdjacentElement('afterend', li);
+    }
+
     function addEmailCard(emailText) {
         const template = document.getElementById('email-card-template');
         const clone = template.content.cloneNode(true);
         const card = clone.querySelector('.email-card');
         card.querySelector('.email-body').innerHTML = emailText.replace(/\n/g, '<br>');
-        
+
         const copyBtn = card.querySelector('.copy-btn');
         copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(emailText);

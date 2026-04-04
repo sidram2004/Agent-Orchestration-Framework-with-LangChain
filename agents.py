@@ -67,6 +67,7 @@ RULES:
 5. Use previous conversation context seamlessly.
 6. If specific data is not found, clearly state what is missing instead of guessing.
 7. Be highly comprehensive! Provide deep, analytical, and detailed explanations using professional formatting (bullet points, Markdown formatting). Do NOT be brief.
+8. After using a tool, ALWAYS return FINAL ANSWER.
 """
 
     #  Research Agent (MAIN)

@@ -1,3 +1,4 @@
+import time
 from agents import create_agents
 from memory import create_shared_memory
 
@@ -24,8 +25,8 @@ User Query:
 
         # STEP 2: Research Agent always runs first to get data
         research_result = research.invoke({"input": combined_input})
-        research_output = research_result["output"]
-        
+        print("🔍 Agent Output:", research_result)
+        research_output = research_result.get("output") or research_result.get("text", "")
         tools_used = []
         if "intermediate_steps" in research_result:
             for action, observation in research_result["intermediate_steps"]:
@@ -52,12 +53,15 @@ User Query:
             final_output = research_output
             email_output = ""
         else:
-            # 📊 Analysis
-            analysis_output = analysis.invoke({"input": research_output})["text"]
-            # 🧾 Summary
-            final_output = summarizer.invoke({"input": analysis_output})["text"]
-            # 📧 Draft Email
-            email_output = email_agent.invoke({"input": final_output})["text"]
+            try:
+                # 📊 Analysis
+                analysis_output = analysis.invoke({"input": research_output})["text"]
+                # 🧾 Summary
+                final_output = summarizer.invoke({"input": analysis_output})["text"]
+            except Exception as analysis_err:
+                print(f"Analysis/Summary skipped due to rate limit: {analysis_err}")
+                final_output = research_output  # fallback to research output
+            email_output = ""  # skip email to save tokens
 
         # 💾 STEP 5: Save correct output
         shared_memory.save_context(
@@ -74,9 +78,20 @@ User Query:
         }
 
     except Exception as e:
-        print(f"Workflow Error: {e}")
+        error_msg = str(e)
+        print(f"Workflow Error: {error_msg}")
+        # If rate limited, wait 3 seconds before responding
+        if "tokens_exceeded" in error_msg or "rate_limit" in error_msg.lower():
+            print("Rate limit hit — waiting 3 seconds...")
+            time.sleep(3)
+            return {
+                "answer": "⚠️ Rate limit reached. Please wait a few seconds and try again.",
+                "email": "",
+                "routing": "RATE_LIMITED",
+                "tools_used": []
+            }
         return {
-            "answer": "Error occurred. Try again.",
+            "answer": f"❌ Error: {error_msg[:200]}",
             "email": "",
             "routing": "ERROR",
             "tools_used": []

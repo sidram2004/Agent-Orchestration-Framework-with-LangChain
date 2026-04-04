@@ -21,25 +21,25 @@ def calculator(query):
 # Weather Tool (FIXED)
 def weather_tool(query):
     try:
-        city = query.lower().replace("weather in", "").strip()
-        city = city.split()[-1]   # ✅ FIX 1
+        import requests, os, re
 
-        if not city:
+        api_key = os.getenv("WEATHER_API_KEY")
+
+        # 🔥 Extract clean city
+        query = query.lower()
+        match = re.search(r"(?:weather\s*(?:in)?\s*)?([a-zA-Z\s]+)", query)
+
+        if not match:
             return "City not found"
 
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
+        city = match.group(1).strip()
+
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
 
         response = requests.get(url)
         data = response.json()
 
-        # CHECK RESPONSE
         if response.status_code != 200:
-            return "City not found"
-
-        # FIX 2 (MOST IMPORTANT)
-        api_city = data.get("name", "").lower()
-
-        if city.strip() != api_city.strip():
             return "City not found"
 
         temp = data["main"]["temp"]
@@ -47,7 +47,7 @@ def weather_tool(query):
         condition = data["weather"][0]["description"]
         wind = data["wind"]["speed"]
 
-        return f"{api_city.title()}: {temp}°C, {condition}, Humidity {humidity}%, Wind {wind} m/s"
+        return f"{city.title()}: {temp}°C, {condition}, Humidity {humidity}%, Wind {wind} m/s"
 
     except:
         return "Weather service unavailable"
