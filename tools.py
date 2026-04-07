@@ -2,6 +2,7 @@ import requests
 import os
 from datetime import datetime
 from ddgs import DDGS
+from sympy import symbols, solve, simplify, diff, integrate, sympify, Eq
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,13 +10,43 @@ load_dotenv()
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 
-# Calculator Tool
+# Advanced Math Solver using SymPy
 def calculator(query):
+    """
+    Advanced mathematical solver that can handle:
+    - Basic arithmetic (e.g. '45 * 8')
+    - Solving equations (e.g. 'x**2 - 2*x + 1 = 0')
+    - Simplifying expressions (e.g. '(x+1)**2')
+    - Calculus (e.g. 'diff(x**2, x)')
+    """
     try:
-        result = eval(query, {"__builtins__": None}, {})
+        query = query.replace('^', '**')
+        
+        if '=' in query:
+            left, right = query.split('=')
+            # Identify symbols (usually 'x' but could be others)
+            # For simplicity, assume 'x' is the primary variable or check for single letters
+            eq = Eq(sympify(left.strip()), sympify(right.strip()))
+            # Auto-detect variables
+            vars = eq.free_symbols
+            if not vars:
+                return str(solve(eq))
+            
+            solution = solve(eq, list(vars))
+            return f"Solutions for {list(vars)}: {solution}"
+        
+        # Otherwise, try to simplify/evaluate
+        result = sympify(query).evalf()
+        if hasattr(result, 'is_number') and not result.is_number:
+            return str(simplify(query))
+            
         return str(result)
-    except Exception:
-        return "Invalid mathematical expression"
+            
+    except Exception as e:
+        try:
+            return str(eval(query, {"__builtins__": None}, {}))
+        except:
+            return f"Error: {str(e)}"
 
 
 # Weather Tool (FIXED)
@@ -101,3 +132,19 @@ def unit_converter(query):
 #  Time Tool
 def current_time(_):
     return datetime.now().strftime("%H:%M:%S")
+if __name__ == '__main__':
+    # --- QUICK MATH ENGINE TEST ---
+    from sympy import symbols, solve, simplify, diff, integrate, sympify, Eq
+    queries = [
+        'x**2 - 2*x + 1 = 0',  # Double Root (D=0)
+        'x^2 + 5x + 6 = 0',    # Two Real Roots (D>0)
+        'x**2 + x + 1 = 0',    # Complex Roots (D<0)
+        'diff(x**3, x)',       # Calculus
+        '45 * 8 / 2'           # Basic Math
+    ]
+
+    print('--- STARTING TOOLS.PY TEST ---\n')
+    for q in queries:
+        print(f'INPUT: {q}')
+        print(f'RESULT:\n{calculator(q)}')
+        print('-' * 30 + '\n')

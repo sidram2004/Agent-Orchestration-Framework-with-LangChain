@@ -1,9 +1,14 @@
 
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from pypdf import PdfReader
-from orchestration import run_workflow  # Ensure this file exists in your directory
+import docx
+import pandas as pd
+from pptx import Presentation
+import io
+import functools
+from orchestration import run_workflow
 
 app = Flask(__name__)
 app.secret_key = "your_secret_encryption_key"
@@ -13,6 +18,52 @@ def get_db():
     conn = sqlite3.connect("database.db")
     conn.row_factory = sqlite3.Row
     return conn
+
+def login_required(f):
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def extract_text_from_file(file):
+    filename = file.filename.lower()
+    content = ""
+    
+    try:
+        if filename.endswith('.pdf'):
+            reader = PdfReader(file)
+            content = "".join([p.extract_text() for p in reader.pages])
+            
+        elif filename.endswith('.docx'):
+            doc = docx.Document(file)
+            content = "\n".join([para.text for para in doc.paragraphs])
+            
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            df = pd.read_excel(file)
+            content = df.to_string(index=False)
+            
+        elif filename.endswith('.csv'):
+            df = pd.read_csv(file)
+            content = df.to_string(index=False)
+            
+        elif filename.endswith('.pptx'):
+            prs = Presentation(file)
+            text_runs = []
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text_runs.append(shape.text)
+            content = "\n".join(text_runs)
+            
+        elif filename.endswith('.txt'):
+            content = file.read().decode('utf-8')
+            
+        return content.strip()
+    except Exception as e:
+        print(f"Extraction Error: {str(e)}")
+        return f"[Error extracting text from {filename}]"
 
 def init_db():
     """Initializes the database tables on startup."""
@@ -34,10 +85,7 @@ def index():
         return redirect(url_for('chat_interface'))
     return render_template('landing.html')
 
-# ... (keep your existing imports and database init code) ...
-
 @app.route('/register', methods=['GET', 'POST'])
-@app.route('/register.html', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         u, p = request.form['username'], request.form['password']
@@ -52,19 +100,14 @@ def register():
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
-@app.route('/login.html', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # 1. Get data from the HTML form
         u = request.form.get('username')
         p = request.form.get('password')
         
         db = get_db()
-        
-        # 2. Query the database (This creates the 'user' variable)
         user = db.execute("SELECT * FROM users WHERE username=?", (u,)).fetchone()
         
-        # 3. Now check if 'user' exists and the password is correct
         if user and check_password_hash(user['password'], p):
             session['user'] = u
             return redirect(url_for('chat_interface'))
@@ -82,13 +125,19 @@ def chat_interface():
     current_chat = request.args.get('chat_id', 'Chat 1')
     db = get_db()
     
-    # Fetch all unique chats for the sidebar
-    rows = db.execute("SELECT DISTINCT chat_id FROM chats WHERE username=?", (session['user'],)).fetchall()
+    # Fetch all unique chats for the sidebar, ordered by the most recent message
+    rows = db.execute("""
+        SELECT chat_id, MAX(id) as last_msg_id 
+        FROM chats 
+        WHERE username=? 
+        GROUP BY chat_id 
+        ORDER BY last_msg_id DESC
+    """, (session['user'],)).fetchall()
     chat_list = [r['chat_id'] for r in rows]
     if not chat_list: chat_list = ["Chat 1"]
     
-    # Fetch message history for the current selected chat
-    history = db.execute("SELECT message, response FROM chats WHERE username=? AND chat_id=?", 
+    # Fetch message history for the current selected chat with IDs
+    history = db.execute("SELECT id, message, response FROM chats WHERE username=? AND chat_id=?", 
                          (session['user'], current_chat)).fetchall()
     
     return render_template('index.html', chat_list=chat_list, current_chat=current_chat, history=history)
@@ -99,26 +148,100 @@ def send_message():
     chat_id = request.form['chat_id']
     user_input = request.form.get('message', '')
 
-    # PDF Logic: If a file is uploaded, extract text and use it as input
+    # PDF/Document Logic: If a file is uploaded, extract text and merge with message
     if 'pdf' in request.files and request.files['pdf'].filename != '':
-        reader = PdfReader(request.files['pdf'])
-        user_input = "".join([p.extract_text() for p in reader.pages])[:1000]
+        file = request.files['pdf']
+        doc_text = extract_text_from_file(file)
+        if doc_text:
+            user_input = f"{user_input}\n\n[Context from Attached Document ({file.filename})]:\n{doc_text}"
+
+    # Check if this is the first message for this chat to trigger naming
+    db = get_db()
+    count = db.execute("SELECT COUNT(*) as c FROM chats WHERE username=? AND chat_id=?", 
+                       (session['user'], chat_id)).fetchone()['c']
+    is_new_chat = (count == 0)
 
     # Run your AI Agent logic
-    # ai_response = run_workflow(user_input)
-    result = run_workflow(user_input)
+    result = run_workflow(user_input, is_new_chat=is_new_chat)
 
     ai_response = result.get("answer", "")
     email_response = result.get("email", "")
+    routing_decision = result.get("routing", "")
     tools_used = result.get("tools_used", [])
+    suggested_name = result.get("suggested_name")
 
-    # Save interaction to DB
+    # Save interaction to DB and get the ID
     db = get_db()
-    db.execute("INSERT INTO chats (chat_id, username, message, response) VALUES (?,?,?,?)",
+    cursor = db.execute("INSERT INTO chats (chat_id, username, message, response) VALUES (?,?,?,?)",
                (chat_id, session['user'], user_input, ai_response))
+    new_id = cursor.lastrowid
     db.commit()
     
-    return jsonify({"message": user_input, "response": ai_response, "email": email_response, "tools_used": tools_used})
+    return jsonify({
+        "id": new_id,
+        "message": user_input, 
+        "response": ai_response, 
+        "answer": ai_response,
+        "routing": routing_decision,
+        "email": email_response, 
+        "tools_used": tools_used,
+        "suggested_name": suggested_name
+    })
+
+@app.route('/edit_message', methods=['POST'])
+@login_required
+def edit_message():
+    """Updates an existing message and regenerates the response."""
+    msg_id = request.form['msg_id']
+    new_text = request.form['message']
+    username = session['user']
+    
+    # Run the updated workflow
+    result = run_workflow(new_text, is_new_chat=False)
+    new_response = result.get("answer", "")
+    
+    db = get_db()
+    try:
+        db.execute("UPDATE chats SET message=?, response=? WHERE id=? AND username=?", 
+                   (new_text, new_response, msg_id, username))
+        db.commit()
+        return jsonify({
+            "success": True, 
+            "new_response": new_response,
+            "tools_used": result.get("tools_used", [])
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/rename_workspace', methods=['POST'])
+def rename_workspace():
+    """Updates session ID (chat_id) in the database for auto-naming."""
+    if 'user' not in session: return jsonify({"error": "Unauthorized"}), 401
+    
+    old_id = request.form['old_id']
+    new_id = request.form['new_id']
+    username = session['user']
+    
+    db = get_db()
+    try:
+        db.execute("UPDATE chats SET chat_id=? WHERE username=? AND chat_id=?", (new_id, username, old_id))
+        db.commit()
+        return jsonify({"success": True, "new_id": new_id})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/clear_chat', methods=['POST'])
+def clear_chat():
+    if 'user' not in session: return jsonify({"error": "Unauthorized"}), 401
+    chat_id = request.form['chat_id']
+    username = session['user']
+    db = get_db()
+    try:
+        db.execute("DELETE FROM chats WHERE username=? AND chat_id=?", (username, chat_id))
+        db.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/delete_chat/<chat_id>')
 def delete_chat(chat_id):
@@ -142,249 +265,3 @@ def script():
 
 if __name__ == '__main__':
     app.run(debug=True)
-# import streamlit as st
-# import sqlite3
-# from pypdf import PdfReader
-# from werkzeug.security import generate_password_hash, check_password_hash
-
-# from orchestration import run_workflow
-
-# # ---------------- CONFIG ----------------
-# st.set_page_config(page_title="AI Multi-Agent System", layout="wide")
-
-# # ---------------- DB ----------------
-# def init_db():
-#     conn = sqlite3.connect("database.db")
-#     c = conn.cursor()
-
-#     c.execute("""CREATE TABLE IF NOT EXISTS users(
-#         id INTEGER PRIMARY KEY,
-#         username TEXT UNIQUE,
-#         password TEXT)""")
-
-#     c.execute("""CREATE TABLE IF NOT EXISTS chats(
-#         id INTEGER PRIMARY KEY,
-#         chat_id TEXT,      
-#         username TEXT,
-#         message TEXT,
-#         response TEXT)""")
-
-#     conn.commit()
-#     conn.close()
-
-# init_db()
-
-# # ---------------- SESSION ----------------
-# if "user" not in st.session_state:
-#     st.session_state.user = None
-
-# if "chat_id" not in st.session_state:
-#     st.session_state.chat_id = "Chat 1"
-
-# if "chat_list" not in st.session_state:
-#     st.session_state.chat_list = ["Chat 1"]
-# # ---------------- VOICE ----------------
-
-# # ---------------- PDF ----------------
-# def read_pdf(file):
-#     reader = PdfReader(file)
-#     text = ""
-#     for page in reader.pages:
-#         text += page.extract_text()
-#     return text
-
-# # ---------------- LOGIN ----------------
-# def login():
-#     st.title("🔐 Login")
-
-#     u = st.text_input("Username")
-#     p = st.text_input("Password", type="password")
-
-#     if st.button("Login"):
-#         db = sqlite3.connect("database.db")
-#         user = db.execute("SELECT * FROM users WHERE username=?", (u,)).fetchone()
-
-#         if user and check_password_hash(user[2], p):
-#             st.session_state.user = u
-#             st.success("Login successful")
-#             st.rerun()
-#         else:
-#             st.error("Invalid credentials")
-
-# # ---------------- REGISTER ----------------
-# def register():
-#     st.title("📝 Register")
-
-#     u = st.text_input("Username")
-#     p = st.text_input("Password", type="password")
-
-#     if st.button("Register"):
-#         db = sqlite3.connect("database.db")
-#         try:
-#             db.execute(
-#                 "INSERT INTO users VALUES(NULL,?,?)",
-#                 (u, generate_password_hash(p))
-#             )
-#             db.commit()
-#             st.success("Account created")
-#         except:
-#             st.error("User exists")
-
-# # ---------------- CHAT ----------------
-# def chat():
-
-#     st.title("🤖 AI Multi-Agent Assistant")
-#     st.markdown(f"### 💬 {st.session_state.chat_id}")
-
-#     db = sqlite3.connect("database.db")
-#     # -------- LOAD CHAT LIST FROM DB --------
-#     chat_ids = db.execute(
-#        "SELECT DISTINCT chat_id FROM chats WHERE username=?",
-#        (st.session_state.user,)
-#     ).fetchall()
-
-#     db_chat_list = [c[0] for c in chat_ids]
-
-# # Merge with session chat list
-#     for chat in db_chat_list:
-#       if chat not in st.session_state.chat_list:
-#         st.session_state.chat_list.append(chat)
-
-#      # Sidebar UI
-#     st.sidebar.title("💬 Chats")
-
-#     # New Chat
-#     if st.sidebar.button("➕ New Chat"):
-#         new_chat = f"chat{len(st.session_state.chat_list)+1}"
-#         st.session_state.chat_list.append(new_chat)
-#         st.session_state.chat_id = new_chat
-#         st.rerun()
-#      # Rename Chat
-#     new_name = st.sidebar.text_input("Rename Chat")
-#     if st.sidebar.button("✏ Rename"):
-#         if new_name:
-#             index = st.session_state.chat_list.index(st.session_state.chat_id)
-#             st.session_state.chat_list[index] = new_name
-#             st.session_state.chat_id = new_name
-#             st.rerun()
-
-#     # Delete Chat
-#     if st.sidebar.button("🗑 Delete Chat"):
-
-#        # Step 1: store current chat FIRST
-#         current_chat = st.session_state.chat_id
-
-#         # Step 2: remove from list
-#         if current_chat in st.session_state.chat_list:
-#            st.session_state.chat_list.remove(current_chat)
-
-#          # Step 3: reset chat safely
-#         if not st.session_state.chat_list:
-#            st.session_state.chat_list = ["Chat 1"]
-
-#         st.session_state.chat_id = st.session_state.chat_list[0]
-
-#         # Step 4: delete from database
-#         db.execute(
-#             "DELETE FROM chats WHERE username=? AND chat_id=?",
-#             (st.session_state.user, current_chat)
-#         )
-#         db.commit()
-
-#         st.rerun()
-       
-
-#     # Chat selection
-#     for chat_name in st.session_state.chat_list:
-#         if st.sidebar.button(chat_name):
-#             st.session_state.chat_id = chat_name
-#             st.rerun()
-
-#     # Load history
-#     chats = db.execute(
-#         "SELECT message,response FROM chats WHERE username=? AND chat_id=?",
-#         (st.session_state.user, st.session_state.chat_id)
-#     ).fetchall()
-
-#     for m, r in chats:
-#         st.chat_message("user").write(m)
-#         st.chat_message("assistant").write(r)
-
-
-#     # Input
-#     user_input = st.chat_input("Type your prompt...")
-
-#     uploaded_file = st.sidebar.file_uploader("📄 Upload PDF")
-
-#     if uploaded_file:
-#         pdf_text = read_pdf(uploaded_file)
-#         st.success("PDF Loaded")
-#         user_input = pdf_text[:500]
-
-#     if user_input and user_input.strip() != "":
-
-#        # Show user message
-#        st.chat_message("user").write(user_input)
-
-#        # Run AI
-#        with st.spinner("🤖 Thinking..."):
-#          result = run_workflow(user_input)
-
-#        # Show response
-#        st.chat_message("assistant").write(result)
-
-#       # Save to DB (INSIDE SAME BLOCK)
-#        db.execute(
-#           "INSERT INTO chats VALUES(NULL,?,?,?,?)",
-#            (st.session_state.chat_id, st.session_state.user, user_input, result)
-#     )
-#     db.commit()
-
-#      # -------- Extra Controls --------
-#     st.sidebar.markdown("## ⚙️ Options")
-
-#     # Clear current chat
-#     if st.sidebar.button("🧹 Clear Current Chat"):
-#         db.execute(
-#             "DELETE FROM chats WHERE username=? AND chat_id=?",
-#             (st.session_state.user, st.session_state.chat_id)
-#         )
-#         db.commit()
-#         st.rerun()
-
-#     # Download chat
-#     if st.sidebar.button("⬇ Download Chat"):
-#         chats = db.execute(
-#             "SELECT message,response FROM chats WHERE username=? AND chat_id=?",
-#             (st.session_state.user, st.session_state.chat_id)
-#         ).fetchall()
-
-#         text = ""
-#         for m, r in chats:
-#             text += f"You: {m}\nAI: {r}\n\n"
-
-#         st.download_button("Download", text, file_name="chat.txt")
-#     # Logout
-#     if st.sidebar.button("🚪 Logout"):
-#         st.session_state.user = None
-#         st.rerun()
-# # ---------------- SIDEBAR ----------------
-# menu = st.sidebar.selectbox("Menu", ["Login", "Register", "Chat"])
-
-# if st.session_state.user:
-#     st.sidebar.success(f"👤 {st.session_state.user}")
-
-    
-
-# # ---------------- ROUTING ----------------
-# if menu == "Login":
-#     login()
-
-# elif menu == "Register":
-#     register()
-
-# elif menu == "Chat":
-#     if st.session_state.user:
-#         chat()
-#     else:
-#         st.warning("Please login first")

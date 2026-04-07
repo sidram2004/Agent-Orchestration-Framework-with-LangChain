@@ -21,8 +21,8 @@ def create_agents():
 
     #  LLM 
     llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        # model = "llama-3.1-8b-instant",
+        # model="llama-3.3-70b-versatile",
+        model = "llama-3.1-8b-instant",
         temperature=0
     )
 
@@ -31,17 +31,18 @@ def create_agents():
         Tool(
             name="Calculator",
             func=calculator,
-            description="Use ONLY for mathematical calculations like 45*6"
+            description="Use for any mathematical calculation, symbolic math, solving equations (e.g., 'x^2-1=0'), and algebra. Return ONLY the numerical result or scientific solution."
         ),
         Tool(
             name="Weather",
             func=weather_tool,
-            description="Use ONLY for real-time weather. Never guess."
+            description="Use ONLY for real-time weather. Never guess. "
+            
         ),
         Tool(
             name="Web Search",
             func=web_search,
-            description="Use for general knowledge and facts"
+            description="Use for general knowledge and facts give in structured format. Never guess. if needed then provide explanation."
         ),
         Tool(
             name="Unit Converter",
@@ -57,17 +58,18 @@ def create_agents():
 
     # STRONG SYSTEM PROMPT
     prefix = """
-You are a highly intelligent and detail-oriented AI assistant.
+ You are a highly intelligent and detail-oriented AI assistant.
 
-RULES:
-1. ALWAYS use tools when needed to conduct deep research.
-2. For math → ALWAYS use Calculator.
-3. For weather → ALWAYS use Weather tool only.
-4. NEVER guess answers; rely on tool outputs.
-5. Use previous conversation context seamlessly.
-6. If specific data is not found, clearly state what is missing instead of guessing.
-7. Be highly comprehensive! Provide deep, analytical, and detailed explanations using professional formatting (bullet points, Markdown formatting). Do NOT be brief.
-8. After using a tool, ALWAYS return FINAL ANSWER.
+CORE RULES:
+1. ALWAYS use tools when needed to provide accurate, up-to-date information.
+2. For ANY mathematical query (arithmetic, algebra, equations) → ALWAYS use the Calculator tool first. If it's an equation, solve for the variable (usually x).
+3. For weather information → ALWAYS use the Weather tool only. NEVER guess the weather.
+4. For general facts and knowledge → Use the Web Search tool.
+5. IF THE USER QUERY IS SIMPLE (e.g., math, weather, time, basic facts) → BE EXTREMELY BRIEF. Return ONLY the result with minimal explanation.
+6. If the query is complex or asks for analysis, use tools to gather data, then provide a structured, insightful response.
+7. Use previous context from memory when relevant.
+8. If data is unavailable, say so clearly instead of guessing.
+9. ALWAYS end with a "Final Answer: " clearly stating the result.
 """
 
     #  Research Agent (MAIN)
@@ -89,12 +91,13 @@ RULES:
     analysis_prompt = PromptTemplate(
         input_variables=["input"],
         template="""
-You are a Senior Analysis Agent capable of deep, multi-faceted thinking.
+You are a Senior Analysis Agent specializing in deep logical reasoning and mathematical synthesis.
 
 Your job:
-- Analyze the given information thoroughly.
-- Draw logical conclusions, identify trends, and expand critically on the facts.
-- Produce a rich, highly-detailed synthesis of the data.
+- Analyze the information provided by the Research Agent.
+- If it's a math problem: Explain the logic, the formula used, and why this result is correct.
+- If it's a general query: Identify trends, draw logical conclusions, and expand critically on the facts.
+- Produce a rich, highly-detailed synthesis that adds value beyond just the raw facts.
 
 Information:
 {input}
@@ -112,21 +115,21 @@ Deep Analysis:
     summary_prompt = PromptTemplate(
         input_variables=["input"],
         template="""
-        Act as a Senior Expert Assistant. 
+Act as a Senior Expert Assistant. 
 
+Using the extensive analysis or raw data provided below, generate a professional final response to the user.
 
+RULES FOR OUTPUT LENGTH:
+1. IF THE INPUT IS SHORT (e.g., a number, weather, time, or simple fact) → DO NOT BE VERBOSE. Return ONLY the final answer in 1 sentence or just the result.
+2. IF THE INPUT IS A DETAILED ANALYSIS → generate a highly detailed, comprehensive, and engaging final response.
+   - Use Markdown syntax headers (##) and bullet points to structure your response beautifully.
+   - Provide deep explanations, context, and insights.
+   - Expand on the topic only if it's complex enough to warrant it.
 
-
-        
-                        Using the extensive analysis provided below, generate a highly detailed, comprehensive, and engaging final response to the user. 
-        - Use Markdown syntax headers (##) and bullet points to structure your response beautifully.
-        - Provide deep explanations, context, and insights just like an advanced analytical AI (like ChatGPT) would.
-        - Do not be brief! Expand carefully on the topic, ensuring absolute clarity and depth.
-
-Analysis Data:
+Input Data:
 {input}
 
-Comprehensive Final Answer:
+Final Answer:
 """
     )
 
@@ -134,9 +137,6 @@ Comprehensive Final Answer:
         llm=llm,
         prompt=summary_prompt
     )
-    # Email Agent (LLMChain)
-    
-
     email_prompt = PromptTemplate(
         input_variables=["input"],
         template="""
@@ -163,18 +163,23 @@ Body:
     router_prompt = PromptTemplate(
         input_variables=["input"],
         template="""
-        You are a task routing supervisor.
-        Analyze the user's query and decide what type of task it is.
+        You are a highly-analytical Task Routing Supervisor. 
+        Analyze the user's query and decide the depth of response needed.
 
         Options:
-        - [SIMPLE]: Task requires just a quick tool lookup (e.g., getting weather, current time, simple math, quick unit conversion).
-        - [COMPLEX]: Task requires deep analysis, drawing conclusions, or drafting an email/report.
+        - [RESEARCH]: Quick responses for simple lookups (e.g., current weather, current time, basic facts, or straightforward calculations).
+        - [COMPLEX]: Deep thinking/multi-agent responses for queries that involve multi-step logic, analysis, comparison, detailed explanations, or creative writing.
+
+        GUIDELINES:
+        1. If the user wants to understand *HOW* or *WHY* a result was achieved (e.g., "how to solve", "show steps", "explain"), always choose [COMPLEX].
+        2. If the user just wants the final answer quickly (e.g., "what is 4+4", "weather in punjab"), choose [RESEARCH].
+        3. Do not rely on specific keywords; use your intelligence to determine if a simple tool-output is sufficient or if a more thorough synthesis/summary is better.
 
         User Query: '{input}'
 
-        Respond with ONLY the word [SIMPLE] or [COMPLEX]. Do not add any extra text.
+        Respond with ONLY the word [RESEARCH] or [COMPLEX].
         """
     )
     router_agent = LLMChain(llm=llm_router, prompt=router_prompt)
     
-    return research_agent, analysis_agent, summarizer_agent, email_agent, router_agent
+    return research_agent, analysis_agent, summarizer_agent, email_agent, router_agent, llm

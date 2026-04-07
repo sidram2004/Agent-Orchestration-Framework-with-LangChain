@@ -2,12 +2,56 @@ import time
 from agents import create_agents
 from memory import create_shared_memory
 
-# Unpack the 5 agents
-research, analysis, summarizer, email_agent, router_agent = create_agents()
+
+# Unpack the 6 agents
+research, analysis, summarizer, email_agent, router_agent, llm = create_agents()
 shared_memory = create_shared_memory()
 
-def run_workflow(user_input):
 
+
+
+
+# 🔥 CLEAN OUTPUT FUNCTION
+def clean_output(text):
+    if not text:
+        return ""
+
+    # 1. Prioritize extracting content after "Final Answer:"
+    if "Final Answer:" in text:
+        return text.split("Final Answer:")[-1].strip()
+
+    # 2. If no "Final Answer:", remove common reasoning keywords
+    clean_lines = []
+    for line in text.splitlines():
+        if any(word in line for word in ["Thought:", "Action:", "Observation:", "Action Input:"]):
+            continue
+        clean_lines.append(line)
+
+    cleaned = "\n".join(clean_lines).strip()
+    
+    # 3. FIX: If the cleaning accidentally deletes everything, 
+    # return the original text so the dashboard is never empty!
+    if not cleaned and text.strip():
+        return text.strip()
+
+    return cleaned
+
+def suggest_chat_name(user_input):
+    """Asks the LLM to provide a short, descriptive 3-4 word name for the chat."""
+    try:
+        name_prompt = f"Analyze this query and suggest a short, professional name for a chat workspace (max 4 words). Query: '{user_input}'. Respond ONLY with the name, no quotes, no extra text."
+        response = llm.invoke(name_prompt)
+        name = response.content.strip().strip('"').strip("'")
+        if len(name.split()) > 6: return None
+        return name
+    except Exception as e:
+        print(f"Naming Error: {e}")
+        return None
+
+
+
+def run_workflow(user_input, is_new_chat=False):
+   
     memory_data = shared_memory.load_memory_variables({"input": user_input})
     history = memory_data.get("history", "")
 
@@ -21,13 +65,18 @@ User Query:
     
     try:
         # STEP 1: Supervisor Routing Decision
-        routing_decision = router_agent.invoke({"input": user_input})["text"].strip()
+        routing_decision = router_agent.invoke({"input": user_input})["text"].strip().upper()
 
-        # STEP 2: Research Agent always runs first to get data
-        research_result = research.invoke({"input": combined_input})
-        print("🔍 Agent Output:", research_result)
-        research_output = research_result.get("output") or research_result.get("text", "")
         tools_used = []
+        email_output = ""
+        
+        # STEP 2: Research Agent runs first to get data
+        research_result = research.invoke({"input": combined_input})
+    
+        research_output = research_result.get("output") or research_result.get("text", "")
+        research_output = clean_output(research_output)   # ✅ CLEAN HERE
+        
+         # 🔥 TOOL TRACKING
         if "intermediate_steps" in research_result:
             for action, observation in research_result["intermediate_steps"]:
                 tool_dict = {}
@@ -49,19 +98,19 @@ User Query:
                     tools_used.append(tool_dict)
 
         # STEP 3: SMART ROUTING based on LLM decision
-        if "[SIMPLE]" in routing_decision:
-            final_output = research_output
-            email_output = ""
+        if "[RESEARCH]" in routing_decision:
+            final_output =  research_output
         else:
             try:
                 # 📊 Analysis
                 analysis_output = analysis.invoke({"input": research_output})["text"]
                 # 🧾 Summary
                 final_output = summarizer.invoke({"input": analysis_output})["text"]
+                final_output = clean_output(final_output)   # ✅ CLEAN COMPLEX
+
             except Exception as analysis_err:
                 print(f"Analysis/Summary skipped due to rate limit: {analysis_err}")
-                final_output = research_output  # fallback to research output
-            email_output = ""  # skip email to save tokens
+                final_output = clean_output(research_output)   # ✅ CLEAN AGAIN
 
         # 💾 STEP 5: Save correct output
         shared_memory.save_context(
@@ -70,12 +119,18 @@ User Query:
         )
 
         # 🔥 FINAL RESPONSE
-        return {
+        res = {
             "answer": final_output,
             "email": email_output,
             "routing": routing_decision,
             "tools_used": tools_used
         }
+
+        # Suggest name if this is a new chat
+        if is_new_chat:
+            res["suggested_name"] = suggest_chat_name(user_input)
+
+        return res
 
     except Exception as e:
         error_msg = str(e)

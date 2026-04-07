@@ -36,9 +36,9 @@
                 <div class="section-title">Workspaces</div>
                 <button class="menu-btn active" id="btn-new-chat"><i class="fa-solid fa-plus"></i> New Workspace</button>
                 <button class="menu-btn" onclick="document.getElementById('pdf-upload').click()">
-                    <i class="fa-solid fa-file-pdf"></i> Upload Context
+                    <i class="fa-solid fa-file-import"></i> Upload Document
                 </button>
-                <input type="file" id="pdf-upload" hidden>
+                <input type="file" id="pdf-upload" accept=".pdf,.docx,.xlsx,.xls,.pptx,.txt,.csv" hidden>
             </div>
 
             <div class="sidebar-section recent-chats fade-in-up">
@@ -69,6 +69,7 @@
                 <h3><i class="fa-solid fa-network-wired"></i> Workflow Execution</h3>
                 <div class="header-actions">
                     <span class="status-badge"><span class="dot pulse"></span> Multi-Agent Online</span>
+                    <button class="glass-btn" id="btn-clear" title="Clear Workspace"><i class="fa-solid fa-broom"></i></button>
                     <button class="glass-btn" id="btn-export" title="Export to PDF/TXT"><i class="fa-solid fa-file-export"></i></button>
                 </div>
             </header>
@@ -85,15 +86,20 @@
                 
                 {% for row in history %}
                 <!-- USER -->
-                <div class="message user-message slide-in">
+                <div class="message user-message slide-in" data-msg-id="{{ row.id }}">
                     <div class="avatar user-avatar"><i class="fa-solid fa-user-astronaut"></i></div>
-                    <div class="message-content glass-pill"><p>{{ row.message }}</p></div>
+                    <div class="message-content glass-pill">
+                        <div class="msg-text-container">
+                            <p class="msg-text">{{ row.message }}</p>
+                            <i class="fa-solid fa-pen-to-square edit-btn" title="Edit message"></i>
+                        </div>
+                    </div>
                 </div>
                 <!-- AI -->
                 <div class="message ai-message slide-in">
                     <div class="avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>
-                    <div class="message-content glass-pill">
-                        <p>{{ row.response }}</p>
+                    <div class="message-content glass-pill" data-markdown="{{ row.response | e }}">
+                        <p>Formatting...</p>
                     </div>
                 </div>
                 {% endfor %}
@@ -101,6 +107,11 @@
 
             <!-- Input Area -->
             <div class="input-container glass-panel-inner">
+                <!-- File Attachment Indicator -->
+                <div id="file-indicator" class="file-badge" style="display: none;">
+                    <i class="fa-solid fa-file-pdf"></i> <span id="file-name"></span>
+                    <i class="fa-solid fa-xmark remove-file" id="remove-file-btn"></i>
+                </div>
                 <form id="chat-form" class="input-form">
                     <input type="hidden" id="chat_id" value="{{ current_chat }}">
                     <button type="button" class="action-btn" id="voice-btn" title="Voice Dictation (Web Speech)"><i class="fa-solid fa-microphone"></i></button>
@@ -151,7 +162,7 @@
                 <li class="step step-routing"><i class="fa-solid fa-route"></i> Supervisor routing task...</li>
                 <li class="step step-research"><i class="fa-solid fa-magnifying-glass"></i> Research Agent gathering data...</li>
                 <li class="step step-analysis"><i class="fa-solid fa-chart-pie"></i> Analysis Agent synthesizing...</li>
-                <li class="step step-email"><i class="fa-solid fa-envelope"></i> Email Agent formatting draft...</li>
+                <li class="step step-synthesis"><i class="fa-solid fa-wand-magic-sparkles"></i> Synthesis Agent generating response...</li>
             </ul>
         </div>
     </template>
