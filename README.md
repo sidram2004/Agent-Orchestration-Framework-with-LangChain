@@ -1,279 +1,140 @@
-# Agent Orchestration Framework with LangChain 
+# OrchestAI: Agent Orchestration Framework with LangChain
 
 ## Project Overview
-Agent Orchestration Framework with LangChain is an AI agent system built using the LangChain framework and the LLaMA model.
-The goal of this project is to demonstrate how an intelligent agent can understand user queries, decide the correct action, and use external tools or APIs to produce accurate responses.
 
-The system connects a **LangChain agent with an LLM (LLaMA via Groq API)** and extends its functionality by integrating tools such as a **calculator and weather service**.
+OrchestAI is an advanced multi-agent orchestration system built using the LangChain framework and the LLaMA model (via Groq). It features a sleek, glassmorphism web dashboard that visualizes the intelligent routing of user queries across multiple specialized AI agents.
 
-Instead of only generating text responses, the agent can **perform tasks using tools**, making the system more practical and interactive.
+The core goal of this project is to demonstrate a dynamic multi-agent pipeline where tasks are intelligently routed, researched using external tools, mathematically analyzed, and synthesized into a beautiful format for the user, fully equipped with conversational memory and document parsing capabilities.
 
+## Key Features
 
-# Technologies Used
+- **Multi-Agent Pipeline**: 
+  - 🚦 **Supervisor Router**: Intelligently decides if a query needs quick research or deep complex multi-step reasoning.
+  - 🔎 **Research Agent**: Uses tools to gather facts, scrape the web, and evaluate math.
+  - 🧠 **Analysis Agent**: Breaks down research data and extracts deep logical insights.
+  - ✨ **Synthesis Agent**: Generates a strictly formatted, professional response for the user.
+- **Advanced Tool Integrations**:
+  - 🧮 **Math & Logic Solver**: Powered by the **SymPy** library to securely evaluate and solve complex algebra, calculus, and mathematical equations.
+  - 🌤️ **Real-time Weather**: Uses the **OpenWeather API** to pull live climate and geographical conditions dynamically.
+  - 🌐 **Web Search Toolkit**: Integrates the **DuckDuckGo Search API (`ddgs`)** to fetch real-time web snippet results for up-to-date knowledge facts.
+  - 📏 **Unit Converter**: Engineered using native Python logic and Regex to dynamically convert various physical measurements (e.g., distance, temperature, weight).
+  - 🕒 **Time Interface**: Uses Python's native `datetime` module to retrieve localized current time information, grounding the AI agent to the present.
+- **Rich Dashboard UI**: A fully functional browser GUI built with Python and modern web frameworks, featuring a glassmorphism aesthetic, active workspace tracking, and a live trace visualization of the agent pipeline.
+- **Document Knowledge Context**: Users can upload `.pdf`, `.docx`, `.xlsx`, `.csv`, and `.pptx` documents directly into the chat for agents to analyze.
 
-### Python
+---
 
-Python is used as the main programming language for developing the agent system.
+## Technologies Used
 
-### LangChain
+- **AI & Orchestration**: Python, LLM frameworks, Large Language Models (LLM API Integrations), Vector Memory, Text Embeddings.
+- **Web App**: Python Web Server, Vanilla JavaScript, CSS3 (Glassmorphism), Markdown rendering.
+- **Core Integrations**: Live Weather API, Search Engine APIs.
+- **Data Science / Math**: Advanced numerical and data manipulation libraries.
+- **Document Parsers**: Comprehensive document extraction libraries.
 
-LangChain is the framework used to build AI agents and manage interactions between the language model and external tools.
+---
 
-### LLaMA (via Groq API)
+## Project Architecture
 
-The project uses the **LLaMA language model** hosted on Groq servers.
-The model processes user queries and helps the agent decide whether to respond directly or use a tool.
+Unlike a basic chatbot, OrchestAI runs a decision-based workflow:
 
-### OpenWeather API
+1. **User Input** arrives through the Web App UI.
+2. **Supervisor Router** classifies the query as `[RESEARCH]` (simple) or `[COMPLEX]`.
+3. **Research Agent** executes the `Zero-Shot ReAct` chain, repeatedly invoking tools (Calculator, Weather, Web Search) until the raw data is gathered.
+4. **Analysis & Synthesis Agents** (Only for Complex workflows) pass the raw data through sequential LLM chains to explain the *how* and *why* behind the answer.
+5. The final output is streamed back to the frontend along with the tools used, intelligently triggering Markdown parsers in the browser to display structured text.
 
-Used to retrieve weather information for any city.
+---
 
-### Requests Library
+## Technical Deep-Dive
 
-Used for sending HTTP requests to external APIs.
+### 🧠 Intelligent Memory Management
+Instead of just passing a simple chat history, OrchestAI utilizes a hybrid memory system:
+- It maintains short-term conversational context natively so the agents remember the current topic during a single reasoning loop.
+- It leverages vector-based semantic search to mathematically convert past interactions into searchable memories. This allows the system to recall distant, relevant facts without overloading the AI's internal context window.
 
-### Virtual Environment (venv)
+### 📄 Multi-Format Document Parsing
+The dashboard accepts drag-and-drop document uploads. The backend (`app.py`) parses text directly from the attachment and injects it as context into the LLM's prompt. Supported formats:
+- **`.pdf`** (via PyPDF)
+- **`.docx`** (via python-docx)
+- **`.xlsx` / `.csv`** (via pandas)
+- **`.pptx`** (via python-pptx)
 
-A virtual environment is used to manage project dependencies and avoid conflicts with other Python packages.
+### 🗄️ Workspace State Management
+All chats are saved via **SQLite3**. The backend maintains isolated histories for multiple workspaces, dynamically generating names for new workspaces using an LLM summary, and sorting them gracefully in the sidebar.
 
-### dotenv
+---
 
-Used to securely store API keys in an environment file.
+## Installation and Setup
 
-# Project Architecture
-
-The system works as an intelligent agent pipeline:
-
-User Input
-↓
-Console Interface
-↓
-LangChain Agent (Zero-Shot Agent)
-↓
-LLaMA Model (Groq API)
-↓
-Agent decides action
-↓
-Tool Invocation (Calculator / Weather API)
-↓
-Response returned to user
-
-The agent uses reasoning to determine whether a tool is needed to answer the user query.
-
-# Milestone 1 – Basic Agent Setup
-
-## Objective
-
-The first milestone focused on creating a basic LangChain agent and setting up the development environment.
-
-## Tasks Completed
-
-• Created a Python virtual environment
-• Installed LangChain and required dependencies
-• Connected the system to the LLaMA model using Groq API
-• Built a **zero-shot LangChain agent**
-• Implemented a console interface for interaction
-• Added a simple calculator tool
-
-## Features Implemented
-
-The agent can:
-
-• Understand user prompts
-• Perform mathematical calculations
-• Generate responses using the LLaMA model
-• Interact with users through a console interface
-
-Example interaction:
-
-User: 25*4
-AI: The result is 100
-
-The calculator functionality works like a basic calculator application where users can perform arithmetic operations.
-
-# Milestone 2 – Tool Integration & API Calling
-
-## Objective
-
-Extend the agent's capabilities by integrating external tools and APIs.
-
-The goal was to allow the agent to perform real tasks beyond text generation.
-
-## Tasks Completed
-
-• Studied LangChain **Tool abstraction**
-• Implemented two tools
-• Integrated tools into the agent context
-• Designed prompts to guide tool usage
-• Tested tool invocation and response handling
-• Added error handling for API failures
-
-# Implemented Tools
-
-## Calculator Tool
-
-The calculator tool allows the agent to solve mathematical expressions.
-
-Example queries:
-
-45*6
-120/4
-78+34
-
-Example output:
-
-The result is 270
-
-Purpose:
-This tool allows the agent to execute calculations instead of relying only on the language model.
-
-## Weather API Tool
-
-The weather tool retrieves weather information for any city using the OpenWeather API.
-
-Example query:
-
-weather in Pune
-
-Example output:
-
-Weather Report for Pune
-Temperature: 28°C
-Condition: Clear sky
-Humidity: 40%
-Wind Speed: 3 m/s
-
-Purpose:
-Demonstrates how AI agents can interact with real external APIs.
-
-# Tool Integration with LangChain Agent
-
-LangChain tools were defined using the `Tool` class.
-
-Each tool contains:
-
-• Name
-• Function
-• Description explaining when the tool should be used
-
-The agent reads the description and decides whether the tool should be invoked.
-
-Example:
-
-User Query → Tool Used
-
-45*6 → Calculator Tool
-weather in Mumbai → Weather Tool
-
-# Error Handling
-
-The project includes error handling mechanisms to ensure stable execution.
-
-Handled situations include:
-
-• Invalid mathematical expressions
-• Unknown city names
-• Weather API request failures
-• Network issues
-
-If an error occurs, the agent returns a safe message instead of crashing.
-
-Example:
-Invalid mathematical expression
-or
-Weather service unavailable
-
-# Console Interface
-
-The system currently runs through a **console interface**, allowing users to interact with the agent in real time.
-
-Example interaction:
-
-You: 45*6
-AI: The result is 270
-You: weather in Delhi
-AI: Temperature: 30°C, Clear sky
-
-Users can continue interacting until they type: exit
-
-# Installation and Setup
-
-## Clone the Repository
-
+### 1. Clone the Repository
+```bash
 git clone https://github.com/your-username/repository-name.git
-
 cd repository-name
+```
 
-## Create Virtual Environment
-
+### 2. Create a Virtual Environment
+```bash
 python -m venv venv
+```
+Activate environment:
+- Windows: `venv\Scripts\activate`
+- macOS/Linux: `source venv/bin/activate`
 
-Activate environment
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+# If no requirements.txt exists yet, install the core packages:
+pip install flask langchain langchain-groq requests python-dotenv duckduckgo-search sympy pypdf python-docx pandas python-pptx faiss-cpu sentence-transformers
+```
 
-Windows:
-venv\Scripts\activate
-
-## Install Dependencies
-
-pip install langchain
-pip install langchain-groq
-pip install requests
-pip install python-dotenv
-
-## Add API Keys
-
-Create a `.env` file in the project root.
-
-Example:
-
+### 4. Configure API Keys
+Create a `.env` file in the project directory and insert your keys:
+```ini
 GROQ_API_KEY=your_groq_key
 WEATHER_API_KEY=your_openweather_key
+```
 
-## Run the Project
+### 5. Run the Application
+```bash
+python app.py
+```
+*The app will be available on `http://127.0.0.1:5000`*
 
-python main.py
+---
 
-# Example Queries
+## Workspace Navigation (Examples)
 
-Try these commands:
+Try these queries inside your OrchestAI dashboard to see the routing system in real-time:
 
-45*6
-120/4
-weather in Pune
-weather in London
+### 🟢 `[RESEARCH]` Pipeline (Simple Queries)
+*Designed to return exact answers quickly using specific tools.*
+- *"weather in Pune"*
+- *"who won the 2024 super bowl?"*
+- *"convert 100 kg to g"*
 
-Type **exit** to stop the program.
+### 🟣 `[COMPLEX]` Pipeline (Deep Reasoning)
+*Triggers the entire 4-stage pipeline resulting in formatted, detailed responses.*
+- *"calculate x^2 - 5x + 6 = 0 and explain the quadratic formula step by step"*
+- *"what are the current trends in artificial intelligence, write a highly detailed summary"*
+- *"draft a professional email to a recruiter explaining my expertise in python"*
 
-# Project Structure
+---
 
-project-folder
-│
-├── main.py
-├── tools.py
-├── .env
-├── .gitignore
-└── venv
-
-# Current Achievements
-
-✔ Working LangChain zero-shot agent
-✔ Integration with LLaMA language model
-✔ Calculator tool implementation
-✔ Weather API integration
-✔ Automatic tool selection by the agent
-✔ Console-based interaction system
-✔ Error handling for reliable execution
-
-# Future Work
-
-The next stages of the project will focus on building a **complete Agent Orchestration Framework**, including:
-
-• Multiple collaborating agents
-• Task planning and workflow management
-• Conversation memory
-• Advanced reasoning and automation
-
-These improvements will transform the system into a **fully orchestrated AI agent platform** capable of handling complex tasks.
-
-# Project Title
-**Agent Orchestration Framework with LangChain **
+## System Structure
+```text
+/
+├── app.py              # Flask Web Server & Authentication
+├── orchestration.py    # Master Workflow Logic and Data Cleaning
+├── agents.py           # LLM Prompts and Agent Chain Definitions
+├── tools.py            # Custom Agent Tools (SymPy, Weather, DDG)
+├── memory.py           # FAISS Vector Memory implementation
+├── database.db         # SQLite Chat History and User tracking
+├── static/
+│   ├── style.css       # Glassmorphism UI Styles
+│   └── script.js       # Frontend Pipeline Animations & Markdown
+└── templates/
+    ├── index.html      # Main Dashboard View
+    ├── login.html      # Authentication UI
+    └── register.html   # Onboarding UI
+```
