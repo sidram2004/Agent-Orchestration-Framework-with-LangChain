@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History — OrchestAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { overflow: hidden; height: 100vh; display: flex; }
+
+        /* ── Layout: sidebar + main ── */
+        .history-layout {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            background: var(--bg-dark);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Left Sidebar ── */
+        .h-sidebar {
+            width: 260px;
+            min-width: 260px;
+            height: 100vh;
+            background: rgba(11,12,16,0.95);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(20px);
+            flex-shrink: 0;
+        }
+        body.light-mode .h-sidebar { background: rgba(245,246,250,0.97); }
+
+        .h-sidebar-top {
+            padding: 20px 16px 12px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .h-brand {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 1rem; font-weight: 600; color: var(--text-light);
+            margin-bottom: 16px; text-decoration: none;
+        }
+
+        /* Search */
+        .h-search-wrap {
+            position: relative;
+        }
+        .h-search-wrap i {
+            position: absolute; left: 10px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-main); font-size: 0.78rem; pointer-events: none;
+        }
+        .h-search {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-light);
+            padding: 8px 10px 8px 30px;
+            border-radius: 8px;
+            font-size: 0.83rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .h-search:focus { border-color: var(--primary-neon); }
+        body.light-mode .h-search { background: rgba(0,0,0,0.04); }
+
+        /* History list */
+        .h-list-wrap {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 8px;
+        }
+        .h-list-wrap::-webkit-scrollbar { width: 4px; }
+        .h-list-wrap::-webkit-scrollbar-thumb { background: rgba(102,252,241,0.15); border-radius: 4px; }
+
+        /* Date group label */
+        .h-group-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-main);
+            padding: 14px 8px 6px;
+            opacity: 0.7;
+        }
+
+        /* Single workspace item */
+        .h-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+            color: var(--text-main);
+            font-size: 0.88rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-decoration: none;
+            position: relative;
+        }
+        .h-item:hover { background: rgba(255,255,255,0.06); color: var(--text-light); }
+        .h-item.active {
+            background: rgba(102,252,241,0.1);
+            color: var(--primary-neon);
+            border: 1px solid rgba(102,252,241,0.2);
+        }
+        body.light-mode .h-item:hover { background: rgba(0,0,0,0.05); }
+        body.light-mode .h-item.active { background: rgba(0,122,255,0.08); color: var(--primary-neon); border-color: rgba(0,122,255,0.2); }
+
+        .h-item i.item-icon { font-size: 0.78rem; flex-shrink: 0; opacity: 0.6; }
+        .h-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+        .h-item-delete {
+            opacity: 0; font-size: 0.72rem; padding: 2px 4px;
+            border-radius: 4px; transition: all 0.15s; flex-shrink: 0;
+            background: none; border: none; color: var(--text-main); cursor: pointer;
+        }
+        .h-item:hover .h-item-delete { opacity: 0.5; }
+        .h-item-delete:hover { opacity: 1 !important; color: var(--accent-red); }
+
+        /* Sidebar footer */
+        .h-sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid var(--glass-border);
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .h-footer-btn {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 10px; border-radius: 8px;
+            color: var(--text-main); font-size: 0.86rem;
+            cursor: pointer; transition: background 0.15s;
+            background: none; border: none; text-align: left; width: 100%;
+            text-decoration: none;
+        }
+        .h-footer-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-light); }
+        .h-footer-btn i { width: 16px; text-align: center; font-size: 0.82rem; }
+        body.light-mode .h-footer-btn:hover { background: rgba(0,0,0,0.05); }
+
+        /* ── Right Panel: conversation view ── */
+        .h-main {
+            flex: 1;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top bar */
+        .h-topbar {
+            padding: 16px 28px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(255,255,255,0.01);
+            flex-shrink: 0;
+        }
+        .h-topbar-title {
+            font-size: 1rem; font-weight: 600; color: var(--text-light);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .h-topbar-title .pipeline-tag {
+            font-size: 0.72rem; padding: 2px 10px; border-radius: 12px;
+            font-weight: 600; border: 1px solid;
+        }
+        .h-topbar-actions { display: flex; gap: 8px; }
+        .h-action-btn {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 6px 14px; border-radius: 8px;
+            font-size: 0.82rem; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+            text-decoration: none;
+        }
+        .h-action-btn:hover { border-color: var(--primary-neon); color: var(--primary-neon); }
+        .h-action-btn.primary {
+            background: rgba(102,252,241,0.1);
+            border-color: rgba(102,252,241,0.3);
+            color: var(--primary-neon);
+        }
+        .h-action-btn.primary:hover { background: rgba(102,252,241,0.2); }
+
+        /* Messages area */
+        .h-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 28px 10%;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            scroll-behavior: smooth;
+        }
+        .h-messages::-webkit-scrollbar { width: 6px; }
+        .h-messages::-webkit-scrollbar-thumb { background: rgba(102,252,241,0.15); border-radius: 4px; }
+
+        /* Empty / welcome state */
+        .h-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+            text-align: center;
+            gap: 12px;
+            padding: 40px;
+        }
+        .h-empty i { font-size: 2.5rem; opacity: 0.25; }
+        .h-empty h3 { font-size: 1rem; color: var(--text-light); opacity: 0.5; font-weight: 500; }
+        .h-empty p { font-size: 0.84rem; opacity: 0.4; max-width: 260px; line-height: 1.5; }
+
+        /* Message bubbles */
+        .h-msg-pair { display: flex; flex-direction: column; gap: 16px; }
+
+        .h-msg-row { display: flex; gap: 14px; align-items: flex-start; }
+        .h-msg-row.user-row { flex-direction: row-reverse; }
+
+        .h-avatar {
+            width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+        }
+        .h-avatar.user  { background: linear-gradient(135deg,#febb2d,#b21f1f); color:#fff; }
+        .h-avatar.ai    { background: linear-gradient(135deg,#203a43,#2c5364); color: var(--primary-neon); border: 1px solid var(--primary-neon); }
+
+        .h-bubble {
+            max-width: 72%;
+            padding: 14px 18px;
+            border-radius: 16px;
+            line-height: 1.65;
+            font-size: 0.92rem;
+            border: 1px solid var(--glass-border);
+        }
+        .h-bubble.user {
+            background: rgba(102,252,241,0.05);
+            border-bottom-right-radius: 4px;
+            color: var(--text-light);
+        }
+        .h-bubble.ai {
+            background: rgba(255,255,255,0.02);
+            border-bottom-left-radius: 4px;
+            color: var(--text-light);
+        }
+        body.light-mode .h-bubble.user { background: rgba(0,122,255,0.07); }
+        body.light-mode .h-bubble.ai   { background: rgba(0,0,0,0.03); }
+
+        /* Markdown inside bubble */
+        .h-bubble h1,.h-bubble h2,.h-bubble h3 { color: var(--primary-neon); margin: 14px 0 6px; font-size: 1em; }
+        .h-bubble h1:first-child,.h-bubble h2:first-child,.h-bubble h3:first-child { margin-top: 0; }
+        .h-bubble ul,.h-bubble ol { margin-left: 18px; margin-bottom: 8px; }
+        .h-bubble li { margin-bottom: 3px; }
+        .h-bubble p { margin-bottom: 8px; }
+        .h-bubble p:last-child { margin-bottom: 0; }
+        .h-bubble code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; font-family: monospace; }
+        .h-bubble pre { background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+        .h-bubble pre code { background: none; padding: 0; }
+        body.light-mode .h-bubble code { background: rgba(0,0,0,0.06); }
+        body.light-mode .h-bubble pre  { background: rgba(0,0,0,0.04); }
+
+        /* Pair meta (timestamp + pipeline) */
+        .h-pair-meta {
+            display: flex; align-items: center; gap: 8px;
+            padding: 0 48px;
+            font-size: 0.72rem; color: var(--text-main); opacity: 0.55;
+        }
+        .h-pair-meta .pipeline-dot {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 1px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 600;
+            border: 1px solid;
+        }
+
+        /* Loading */
+        .h-loading {
+            display: flex; align-items: center; justify-content: center;
+            gap: 10px; padding: 40px; color: var(--text-main); font-size: 0.9rem;
+        }
+
+        /* Badge colours */
+        .badge-simple   { border-color:rgba(74,222,128,0.4);  background:rgba(74,222,128,0.08);  color:#4ade80; }
+        .badge-tool     { border-color:rgba(251,191,36,0.4);  background:rgba(251,191,36,0.08);  color:#fbbf24; }
+        .badge-content  { border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.08); color:#a78bfa; }
+        .badge-medical  { border-color:rgba(248,113,113,0.4); background:rgba(248,113,113,0.08); color:#f87171; }
+        .badge-decision { border-color:rgba(96,165,250,0.4);  background:rgba(96,165,250,0.08);  color:#60a5fa; }
+        .badge-debug    { border-color:rgba(251,146,60,0.4);  background:rgba(251,146,60,0.08);  color:#fb923c; }
+        .badge-shopping { border-color:rgba(52,211,153,0.4);  background:rgba(52,211,153,0.08);  color:#34d399; }
+        .badge-general  { border-color:rgba(102,252,241,0.3); background:rgba(102,252,241,0.06); color:#66fcf1; }
+    </style>
+</head>
+<body>
+    <div class="glass-background" style="position:fixed;">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="history-layout">
+
+        <!-- ══ LEFT SIDEBAR ══ -->
+        <aside class="h-sidebar">
+            <div class="h-sidebar-top">
+                <a href="/chat" class="h-brand">
+                    <i class="fa-solid fa-microchip neon-icon"></i> OrchestAI
+                </a>
+                <div class="h-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" class="h-search" id="h-search" placeholder="Search conversations...">
+                </div>
+            </div>
+
+            <div class="h-list-wrap" id="h-list-wrap">
+                <div class="h-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>
+            </div>
+
+            <div class="h-sidebar-footer">
+                <a href="/chat" class="h-footer-btn">
+                    <i class="fa-solid fa-plus"></i> New Chat
+                </a>
+                <button class="h-footer-btn" id="btn-theme">
+                    <i class="fa-solid fa-moon"></i> Toggle Theme
+                </button>
+                <a href="/logout" class="h-footer-btn" style="color:var(--accent-red);">
+                    <i class="fa-solid fa-power-off"></i> Logout
+                </a>
+            </div>
+        </aside>
+
+        <!-- ══ RIGHT PANEL ══ -->
+        <main class="h-main">
+            <!-- Top bar -->
+            <div class="h-topbar" id="h-topbar">
+                <div class="h-topbar-title" id="h-topbar-title">
+                    <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary-neon);"></i>
+                    Select a conversation
+                </div>
+                <div class="h-topbar-actions" id="h-topbar-actions" style="display:none;">
+                    <button class="h-action-btn" id="btn-copy-all">
+                        <i class="fa-regular fa-copy"></i> Copy All
+                    </button>
+                    <a href="#" class="h-action-btn primary" id="btn-goto-chat">
+                        <i class="fa-solid fa-comments"></i> Open in Chat
+                    </a>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <div class="h-messages" id="h-messages">
+                <div class="h-empty">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <h3>Your history is here</h3>
+                    <p>Select any conversation from the left to read it.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // ── Theme ────────────────────────────────────────────────────────
+        if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-mode');
+        document.getElementById('btn-theme').addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+        });
+
+        // ── State ────────────────────────────────────────────────────────
+        let allWorkspaces = [];  // { chat_id, last_ts, last_msg }
+        let activeId      = null;
+
+        // ── Helpers ───────────────────────────────────────────────────────
+        function getBadgeClass(r) {
+            r = (r||'').toUpperCase();
+            if (r.includes('SIMPLE'))   return 'badge-simple';
+            if (r.includes('TOOL'))     return 'badge-tool';
+            if (r.includes('CONTENT'))  return 'badge-content';
+            if (r.includes('MEDICAL'))  return 'badge-medical';
+            if (r.includes('DECISION')) return 'badge-decision';
+            if (r.includes('DEBUG'))    return 'badge-debug';
+            if (r.includes('SHOPPING')) return 'badge-shopping';
+            return 'badge-general';
+        }
+        function getPipelineLabel(r) {
+            r = (r||'').toUpperCase();
+            if (r.includes('SIMPLE'))   return '⚡ Simple';
+            if (r.includes('TOOL'))     return '🛠 Tool';
+            if (r.includes('CONTENT'))  return '✍️ Content';
+            if (r.includes('MEDICAL'))  return '🏥 Medical';
+            if (r.includes('DECISION')) return '⚖️ Decision';
+            if (r.includes('DEBUG'))    return '🐛 Debug';
+            if (r.includes('SHOPPING')) return '🛒 Shopping';
+            return '🔍 General';
+        }
+
+        // Group by date like ChatGPT
+        function getDateGroup(tsStr) {
+            if (!tsStr) return 'Older';
+            const d    = new Date(tsStr);
+            const now  = new Date();
+            const diff = Math.floor((now - d) / 86400000);
+            if (diff === 0)         return 'Today';
+            if (diff === 1)         return 'Yesterday';
+            if (diff <= 7)          return 'Previous 7 Days';
+            if (diff <= 30)         return 'Previous 30 Days';
+            return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+        }
+
+        // ── Load sidebar workspaces ──────────────────────────────────────
+        async function loadWorkspaces(filter = '') {
+            const res  = await fetch(`/api/history?per_page=200&page=1`);
+            const data = await res.json();
+
+            // Deduplicate — get unique workspaces with latest timestamp
+            const map = {};
+            data.rows.forEach(r => {
+                if (!map[r.chat_id] || r.timestamp > map[r.chat_id].timestamp) {
+                    map[r.chat_id] = r;
+                }
+            });
+            allWorkspaces = Object.values(map).sort((a,b) => (b.timestamp||'').localeCompare(a.timestamp||''));
+
+            renderSidebar(filter);
+        }
+
+        function renderSidebar(filter = '') {
+            const wrap = document.getElementById('h-list-wrap');
+            let items  = allWorkspaces;
+            if (filter) {
+                items = items.filter(w =>
+                    w.chat_id.toLowerCase().includes(filter.toLowerCase()) ||
+                    (w.message||'').toLowerCase().includes(filter.toLowerCase())
+                );
+            }
+
+            if (!items.length) {
+                wrap.innerHTML = '<div style="padding:20px 12px;font-size:0.82rem;color:var(--text-main);opacity:0.5;text-align:center;">No conversations found</div>';
+                return;
+            }
+
+            // Group by date
+            const groups = {};
+            items.forEach(w => {
+                const g = getDateGroup(w.timestamp);
+                if (!groups[g]) groups[g] = [];
+                groups[g].push(w);
+            });
+
+            const ORDER = ['Today','Yesterday','Previous 7 Days','Previous 30 Days'];
+            const keys  = [...ORDER.filter(k => groups[k]), ...Object.keys(groups).filter(k => !ORDER.includes(k))];
+
+            wrap.innerHTML = keys.map(group => `
+                <div class="h-group-label">${group}</div>
+                ${groups[group].map(w => `
+                    <div class="h-item ${w.chat_id === activeId ? 'active' : ''}"
+                         data-id="${w.chat_id}"
+                         onclick="openWorkspace('${encodeURIComponent(w.chat_id)}')">
+                        <i class="fa-regular fa-message item-icon"></i>
+                        <span class="h-item-name">${w.chat_id}</span>
+                        <button class="h-item-delete"
+                            onclick="event.stopPropagation(); deleteWorkspace('${encodeURIComponent(w.chat_id)}')"
+                            title="Delete">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>`).join('')}
+            `).join('');
+        }
+
+        // ── Open workspace — load and show messages ──────────────────────
+        window.openWorkspace = async function(encodedId) {
+            const chatId = decodeURIComponent(encodedId);
+            activeId     = chatId;
+
+            // Mark active in sidebar
+            document.querySelectorAll('.h-item').forEach(el => {
+                el.classList.toggle('active', el.dataset.id === chatId);
+            });
+
+            // Update topbar
+            document.getElementById('h-topbar-title').innerHTML =
+                `<i class="fa-solid fa-message" style="color:var(--primary-neon);"></i> ${chatId}`;
+            document.getElementById('h-topbar-actions').style.display = 'flex';
+            document.getElementById('btn-goto-chat').href = `/chat?chat_id=${encodedId}`;
+
+            // Show loading
+            const msgs = document.getElementById('h-messages');
+            msgs.innerHTML = '<div class="h-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>';
+
+            // Fetch all messages for this workspace
+            const res  = await fetch(`/api/history?workspace=${encodedId}&per_page=200&page=1`);
+            const data = await res.json();
+
+            if (!data.rows.length) {
+                msgs.innerHTML = `
+                    <div class="h-empty">
+                        <i class="fa-solid fa-comment-slash"></i>
+                        <h3>No messages</h3>
+                        <p>This workspace is empty.</p>
+                    </div>`;
+                return;
+            }
+
+            // Render messages oldest first
+            const rows = [...data.rows].reverse();
+            msgs.innerHTML = rows.map(row => {
+                const bc  = getBadgeClass(row.routing);
+                const lbl = getPipelineLabel(row.routing);
+                const ts  = row.timestamp ? row.timestamp.substring(0,16).replace('T',' ') : '';
+                const aiHtml = typeof marked !== 'undefined' ? marked.parse(row.response||'') : (row.response||'');
+
+                return `
+                <div class="h-msg-pair">
+                    <!-- User message -->
+                    <div class="h-msg-row user-row">
+                        <div class="h-avatar user"><i class="fa-solid fa-user"></i></div>
+                        <div class="h-bubble user">${escHtml(row.message||'')}</div>
+                    </div>
+                    <!-- AI response -->
+                    <div class="h-msg-row">
+                        <div class="h-avatar ai"><i class="fa-solid fa-robot"></i></div>
+                        <div class="h-bubble ai">${aiHtml}</div>
+                    </div>
+                    <!-- Meta -->
+                    <div class="h-pair-meta">
+                        <span>${ts}</span>
+                        ${row.routing ? `<span class="pipeline-dot ${bc}">${lbl}</span>` : ''}
+                        ${row.response_time ? `<span>⏱ ${row.response_time}s</span>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+
+            msgs.scrollTop = 0;
+        };
+
+        // ── Delete workspace ─────────────────────────────────────────────
+        window.deleteWorkspace = async function(encodedId) {
+            const chatId = decodeURIComponent(encodedId);
+            if (!confirm(`Delete workspace "${chatId}"?`)) return;
+            await fetch(`/delete_chat/${encodedId}`);
+            if (activeId === chatId) {
+                activeId = null;
+                document.getElementById('h-messages').innerHTML = `
+                    <div class="h-empty">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <h3>Your history is here</h3>
+                        <p>Select any conversation from the left to read it.</p>
+                    </div>`;
+                document.getElementById('h-topbar-title').innerHTML =
+                    `<i class="fa-solid fa-clock-rotate-left" style="color:var(--primary-neon);"></i> Select a conversation`;
+                document.getElementById('h-topbar-actions').style.display = 'none';
+            }
+            allWorkspaces = allWorkspaces.filter(w => w.chat_id !== chatId);
+            renderSidebar(document.getElementById('h-search').value);
+        };
+
+        // ── Copy all ─────────────────────────────────────────────────────
+        document.getElementById('btn-copy-all').addEventListener('click', () => {
+            const msgs   = document.getElementById('h-messages');
+            const pairs  = [...msgs.querySelectorAll('.h-msg-pair')];
+            let text = '';
+            pairs.forEach(pair => {
+                const userBubble = pair.querySelector('.user-row .h-bubble');
+                const aiBubble   = pair.querySelector('.h-msg-row:not(.user-row) .h-bubble');
+                if (userBubble) text += `You: ${userBubble.innerText}\n\n`;
+                if (aiBubble)   text += `AI: ${aiBubble.innerText}\n\n---\n\n`;
+            });
+            navigator.clipboard.writeText(text.trim());
+            const btn = document.getElementById('btn-copy-all');
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+            setTimeout(() => { btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy All'; }, 2000);
+        });
+
+        // ── Search ────────────────────────────────────────────────────────
+        let searchTimer;
+        document.getElementById('h-search').addEventListener('input', function() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => renderSidebar(this.value.trim()), 250);
+        });
+
+        // ── Escape html ───────────────────────────────────────────────────
+        function escHtml(t) {
+            return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        // ── Init ──────────────────────────────────────────────────────────
+        loadWorkspaces();
+    });
+    </script>
+</body>
+</html>

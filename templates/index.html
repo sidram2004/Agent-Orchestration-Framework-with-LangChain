@@ -8,10 +8,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Marked.js for Markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="glass-background">
@@ -20,12 +19,11 @@
         <div class="blob blob-3"></div>
     </div>
 
-    <!-- Theme Toggle Floating -->
     <button id="theme-toggle" class="glass-btn theme-btn floating-tr"><i class="fa-solid fa-moon"></i> Theme</button>
 
     <div class="app-container glass-panel">
-        
-        <!-- Sidebar -->
+
+        <!-- ══ SIDEBAR ══ -->
         <aside class="sidebar">
             <div class="brand">
                 <i class="fa-solid fa-microchip neon-icon icon-lg"></i>
@@ -41,49 +39,86 @@
                 <input type="file" id="pdf-upload" accept=".pdf,.docx,.xlsx,.xls,.pptx,.txt,.csv" hidden>
             </div>
 
+            <!-- Feature 4: Search -->
+            <div class="sidebar-section">
+                <div class="section-title">Search</div>
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="search-input" placeholder="Search history..." autocomplete="off">
+                </div>
+                <div id="search-results" class="search-results" style="display:none;"></div>
+            </div>
+
             <div class="sidebar-section recent-chats fade-in-up">
                 <div class="section-title">History</div>
-                <!-- Dynamic List -->
                 <div id="chat-history-list">
                     {% for c in chat_list %}
-                    <a href="/chat?chat_id={{c}}" style="text-decoration:none; color:inherit;">
-                    <div class="chat-item {{ 'active' if c == current_chat else '' }}" data-chat-id="{{ c }}">
-                        <i class="fa-regular fa-message"></i>
-                        <span>{{ c }}</span>
-                        <i class="fa-solid fa-trash delete-chat hover-red" onclick="event.preventDefault(); window.location.href='/delete_chat/{{c}}'"></i>
-                    </div>
+                    <a href="/chat?chat_id={{c}}" style="text-decoration:none;color:inherit;">
+                        <div class="chat-item {{ 'active' if c == current_chat else '' }}" data-chat-id="{{ c }}">
+                            <i class="fa-regular fa-message"></i>
+                            <span>{{ c }}</span>
+                            <i class="fa-solid fa-trash delete-chat hover-red"
+                               onclick="event.preventDefault();window.location.href='/delete_chat/{{c}}'"></i>
+                        </div>
                     </a>
                     {% endfor %}
                 </div>
             </div>
 
             <div class="sidebar-footer">
+                <!-- Feature 11: Prompt Templates -->
+                <button class="menu-btn" id="btn-templates"><i class="fa-solid fa-bolt"></i> Quick Prompts</button>
+                <!-- Feature 7: Pinned -->
+                <button class="menu-btn" id="btn-pinned"><i class="fa-solid fa-thumbtack"></i> Pinned</button>
+                <!-- History Page -->
+                <a href="/history" class="menu-btn" style="text-decoration:none;color:inherit;"><i class="fa-solid fa-clock-rotate-left"></i> Full History</a>
+                <!-- Analytics Page -->
+                <a href="/analytics" class="menu-btn" style="text-decoration:none;color:inherit;"><i class="fa-solid fa-chart-line"></i> Analytics</a>
+                <!-- Feature 6: Memory -->
+                <button class="menu-btn" id="btn-memory"><i class="fa-solid fa-brain"></i> Memory</button>
+                <!-- Feature 10: Profile -->
+                <button class="menu-btn" id="btn-profile"><i class="fa-solid fa-user-circle"></i> Profile</button>
                 <button class="menu-btn" id="btn-settings"><i class="fa-solid fa-gear"></i> Settings</button>
-                <button class="menu-btn danger-text" onclick="window.location.href='/logout'"><i class="fa-solid fa-power-off"></i> Disconnect</button>
+                <button class="menu-btn danger-text" onclick="window.location.href='/logout'">
+                    <i class="fa-solid fa-power-off"></i> Disconnect
+                </button>
             </div>
         </aside>
 
-        <!-- Main Dashboard -->
+        <!-- ══ MAIN CHAT ══ -->
         <main class="chat-area">
             <header class="chat-header">
-                <h3><i class="fa-solid fa-network-wired"></i> Workflow Execution</h3>
+                <h3><i class="fa-solid fa-network-wired"></i> Workflow Execution
+                    <span style="font-size:0.75rem;color:var(--text-main);font-weight:400;margin-left:8px;">— {{ username }}</span>
+                </h3>
                 <div class="header-actions">
+                    <!-- Feature 8: Language -->
+                    <select id="lang-select" class="lang-select" title="Response Language">
+                        <option value="en" {% if language=='en' %}selected{% endif %}>🌐 English</option>
+                        <option value="hi" {% if language=='hi' %}selected{% endif %}>🇮🇳 Hindi</option>
+                        <option value="mr" {% if language=='mr' %}selected{% endif %}>🇮🇳 Marathi</option>
+                        <option value="es" {% if language=='es' %}selected{% endif %}>🇪🇸 Spanish</option>
+                        <option value="fr" {% if language=='fr' %}selected{% endif %}>🇫🇷 French</option>
+                        <option value="de" {% if language=='de' %}selected{% endif %}>🇩🇪 German</option>
+                        <option value="ja" {% if language=='ja' %}selected{% endif %}>🇯🇵 Japanese</option>
+                        <option value="ar" {% if language=='ar' %}selected{% endif %}>🇸🇦 Arabic</option>
+                    </select>
                     <span class="status-badge"><span class="dot pulse"></span> Multi-Agent Online</span>
                     <button class="glass-btn" id="btn-clear" title="Clear Workspace"><i class="fa-solid fa-broom"></i></button>
-                    <button class="glass-btn" id="btn-export" title="Export to PDF/TXT"><i class="fa-solid fa-file-export"></i></button>
+                    <button class="glass-btn" id="btn-export" title="Export Chat"><i class="fa-solid fa-file-export"></i></button>
                 </div>
             </header>
 
             <div class="chat-flow" id="chat-flow">
-                <!-- Welcome Message -->
+                <!-- Welcome -->
                 <div class="message ai-message slide-in">
                     <div class="avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>
                     <div class="message-content glass-pill">
-                        <p>Welcome to OrchestAI Workspace.</p>
-                        <p>I am online and ready to orchestrate your tasks. You can use voice dictation using the microphone icon below, or toggle my settings using the gear icon on the left.</p>
+                        <p>Welcome to <strong>OrchestAI</strong> — Advanced Agent Orchestration.</p>
+                        <p>Routing through <strong>Medical · Decision · Debug · Shopping · General · Content</strong> pipelines. Use <strong>Quick Prompts</strong> for fast access, or type anything below.</p>
                     </div>
                 </div>
-                
+
                 {% for row in history %}
                 <!-- USER -->
                 <div class="message user-message slide-in" data-msg-id="{{ row.id }}">
@@ -91,70 +126,216 @@
                     <div class="message-content glass-pill">
                         <div class="msg-text-container">
                             <p class="msg-text">{{ row.message }}</p>
-                            <i class="fa-solid fa-pen-to-square edit-btn" title="Edit message"></i>
+                            <div class="msg-actions">
+                                <i class="fa-solid fa-pen-to-square edit-btn" title="Edit"></i>
+                                <i class="fa-solid fa-thumbtack pin-btn {{ 'pinned-active' if row.pinned else '' }}"
+                                   title="{{ 'Unpin' if row.pinned else 'Pin' }}" data-pinned="{{ row.pinned }}"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <!-- AI -->
+                <!-- Pipeline Badge -->
+                {% if row.routing %}
+                <div class="pipeline-badge {{ get_badge_class(row.routing) }} slide-in">
+                    <i class="fa-solid fa-route"></i> {{ row.routing }}
+                    {% if row.response_time %}<span class="response-timer">⏱ {{ row.response_time }}s</span>{% endif %}
+                </div>
+                {% endif %}
+                <!-- AI RESPONSE -->
                 <div class="message ai-message slide-in">
                     <div class="avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>
-                    <div class="message-content glass-pill" data-markdown="{{ row.response | e }}">
-                        <p>Formatting...</p>
+                    <div class="msg-col">
+                        <div class="ai-msg-actions">
+                            <span class="ai-name"><i class="fa-solid fa-microchip"></i> ORCHESTAI</span>
+                            <div class="ai-btn-group">
+                                <button class="ai-action-btn copy-response-btn" title="Copy response"><i class="fa-regular fa-copy"></i></button>
+                                <button class="ai-action-btn tts-btn" title="Read aloud"><i class="fa-solid fa-volume-high"></i></button>
+                            </div>
+                        </div>
+                        <div class="message-content glass-pill" data-markdown="{{ row.response | e }}">
+                            <p>Formatting...</p>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
 
-            <!-- Input Area -->
+            <!-- Feature 11: Quick Prompt Bar (hidden by default) -->
+            <div id="quick-prompts-bar" class="quick-prompts-bar" style="display:none;">
+                <div class="qp-label">Quick Prompts</div>
+                <div class="qp-chips">
+                    <button class="qp-chip" data-prompt="Write a professional email to my manager requesting leave for 2 days"><i class="fa-solid fa-envelope"></i> Write Email</button>
+                    <button class="qp-chip" data-prompt="Debug this code and explain the error:"><i class="fa-solid fa-bug"></i> Debug Code</button>
+                    <button class="qp-chip" data-prompt="Research and summarize the latest developments in"><i class="fa-solid fa-magnifying-glass"></i> Research Topic</button>
+                    <button class="qp-chip" data-prompt="Compare the pros and cons of"><i class="fa-solid fa-scale-balanced"></i> Compare Options</button>
+                    <button class="qp-chip" data-prompt="What is the weather in"><i class="fa-solid fa-cloud-sun"></i> Weather</button>
+                    <button class="qp-chip" data-prompt="Explain step by step how to"><i class="fa-solid fa-list-ol"></i> Explain Steps</button>
+                    <button class="qp-chip" data-prompt="Write a blog post about"><i class="fa-solid fa-pen-nib"></i> Blog Post</button>
+                    <button class="qp-chip" data-prompt="What are the best products for"><i class="fa-solid fa-cart-shopping"></i> Shopping</button>
+                </div>
+            </div>
+
+            <!-- Input -->
             <div class="input-container glass-panel-inner">
-                <!-- File Attachment Indicator -->
-                <div id="file-indicator" class="file-badge" style="display: none;">
-                    <i class="fa-solid fa-file-pdf"></i> <span id="file-name"></span>
+                <div id="file-indicator" class="file-badge" style="display:none;">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span id="file-name"></span>
                     <i class="fa-solid fa-xmark remove-file" id="remove-file-btn"></i>
                 </div>
                 <form id="chat-form" class="input-form">
                     <input type="hidden" id="chat_id" value="{{ current_chat }}">
-                    <button type="button" class="action-btn" id="voice-btn" title="Voice Dictation (Web Speech)"><i class="fa-solid fa-microphone"></i></button>
+                    <input type="hidden" id="user-language" value="{{ language }}">
+                    <button type="button" class="action-btn" id="voice-btn" title="Voice Dictation">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                    <button type="button" class="action-btn" id="btn-templates-inline" title="Quick Prompts">
+                        <i class="fa-solid fa-bolt"></i>
+                    </button>
                     <input type="text" id="user-msg" placeholder="Command the orchestration agents..." autocomplete="off">
-                    <button type="submit" class="action-btn send-btn" id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                    <button type="submit" class="action-btn send-btn" id="send-btn">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
                 </form>
             </div>
         </main>
     </div>
 
-    <!-- Agent Settings Modal -->
+    <!-- ══ MODALS ══ -->
+
+    <!-- Settings Modal -->
     <div class="modal-overlay" id="settings-modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-sliders"></i> Agent Configuration</h3>
-                <button class="close-btn" id="close-settings"><i class="fa-solid fa-xmark"></i></button>
+                <button class="close-btn modal-close"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
                 <div class="setting-row">
                     <span>Web Search Access</span>
-                    <label class="switch">
-                        <input type="checkbox" checked id="toggle-search">
-                        <span class="slider"></span>
-                    </label>
+                    <label class="switch"><input type="checkbox" checked id="toggle-search"><span class="slider"></span></label>
                 </div>
                 <div class="setting-row">
                     <span>Advanced Analytics Engine</span>
-                    <label class="switch">
-                        <input type="checkbox" checked id="toggle-analytics">
-                        <span class="slider"></span>
-                    </label>
+                    <label class="switch"><input type="checkbox" checked id="toggle-analytics"><span class="slider"></span></label>
                 </div>
-                <!-- Mock Slider for Temp -->
-                <div style="margin-top: 20px;">
-                    <span style="font-size: 0.9rem; color: #888;">AI Temperature (Creativity)</span>
-                    <input type="range" min="1" max="100" value="20" style="width: 100%; margin-top: 10px;" id="temp-slider">
+                <div class="setting-row">
+                    <span>Text-to-Speech</span>
+                    <label class="switch"><input type="checkbox" checked id="toggle-tts"><span class="slider"></span></label>
+                </div>
+                <div style="margin-top:20px;">
+                    <span style="font-size:0.9rem;color:#888;">AI Temperature (Creativity)</span>
+                    <input type="range" min="1" max="100" value="20" style="width:100%;margin-top:10px;" id="temp-slider">
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Feature 1: Analytics Modal -->
+    <div class="modal-overlay" id="analytics-modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-chart-line neon-icon"></i> Live Analytics</h3>
+                <button class="close-btn modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="analytics-body">
+                <!-- Row 1: Quick Stats Cards -->
+                <div class="analytics-stats-grid" id="analytics-stats"></div>
+                
+                <!-- Row 2: Main Charts -->
+                <div class="analytics-charts-row">
+                    <div class="chart-container-main">
+                        <div class="chart-title">System Activity (7 Days)</div>
+                        <canvas id="daily-chart"></canvas>
+                    </div>
+                    <div class="chart-container-side">
+                        <div class="chart-title">Tool Distribution</div>
+                        <canvas id="dist-chart"></canvas>
+                    </div>
+                </div>
 
-    <!-- Template for Agent Steps (Hidden by Default) -->
+                <!-- NEW Row: System Status -->
+                <div class="analytics-status-section" style="margin-bottom: 24px;">
+                    <div class="chart-title">System Engine Status</div>
+                    <div id="active-system-list" class="active-system-list"></div>
+                </div>
+                
+                <!-- Row 3: Event Log -->
+                <div class="analytics-log-section">
+                    <div class="chart-title">Live Pipeline Event Log</div>
+                    <div id="analytics-recent" class="analytics-event-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature 6: Memory Modal -->
+    <div class="modal-overlay" id="memory-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-brain neon-icon"></i> Neural Core Memory</h3>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <button class="glass-btn" id="btn-clear-memory" title="Format Neural Core" style="font-size:0.65rem; padding:4px 10px; border-color:var(--accent-red); color:var(--accent-red);"><i class="fa-solid fa-fire"></i> Wipe</button>
+                    <button class="close-btn modal-close"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.8rem;color:var(--text-main);margin-bottom:20px;opacity:0.8;line-height:1.4;">Persistent cognitive patterns stored across agent execution cycles. Manage established context below.</p>
+                <div class="memory-input-group">
+                    <input type="text" id="mem-key" placeholder="Key (e.g. USER_NAME)" class="modal-input" style="flex:1">
+                    <input type="text" id="mem-val" placeholder="Value (e.g. Alex)" class="modal-input" style="flex:2">
+                    <button class="glass-btn glowing-btn" id="btn-add-memory" style="white-space:nowrap; height:40px; width:44px;" title="Initialize Pattern">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+                <div id="memory-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature 7: Pinned Modal -->
+    <div class="modal-overlay" id="pinned-modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-thumbtack neon-icon"></i> Pinned Messages</h3>
+                <button class="close-btn modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="pinned-list"></div>
+        </div>
+    </div>
+
+    <!-- Feature 10: Profile Modal -->
+    <div class="modal-overlay" id="profile-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-user-circle neon-icon"></i> User Profile</h3>
+                <button class="close-btn modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="profile-stats" class="profile-stats-grid"></div>
+                <hr style="border-color:var(--glass-border);margin:20px 0;">
+                <div style="font-size:0.85rem;color:var(--text-main);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">Change Password</div>
+                <input type="password" id="old-password" placeholder="Current password" class="modal-input" style="width:100%;margin-bottom:10px;">
+                <input type="password" id="new-password" placeholder="New password" class="modal-input" style="width:100%;margin-bottom:10px;">
+                <button class="glass-btn glowing-btn" id="btn-change-password" style="width:100%;">Update Password</button>
+                <div id="profile-msg" style="margin-top:10px;font-size:0.85rem;text-align:center;"></div>
+                <hr style="border-color:var(--glass-border);margin:20px 0;">
+                <div style="font-size:0.85rem;color:var(--text-main);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">Response Language</div>
+                <select id="profile-lang" class="modal-input" style="width:100%;">
+                    <option value="en">English</option>
+                    <option value="hi">Hindi</option>
+                    <option value="mr">Marathi</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ar">Arabic</option>
+                </select>
+                <button class="glass-btn" id="btn-save-language" style="width:100%;margin-top:10px;">Save Language</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates -->
     <template id="agent-steps-template">
         <div class="agent-trace slide-in">
             <div class="trace-header">Executing Agent Pipeline...</div>

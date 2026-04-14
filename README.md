@@ -1,71 +1,75 @@
-# OrchestAI: Agent Orchestration Framework with LangChain
+# OrchestAI: Advanced Agent Orchestration Framework
 
 ## Project Overview
 
-OrchestAI is an advanced multi-agent orchestration system built using the LangChain framework and the LLaMA model (via Groq). It features a sleek, glassmorphism web dashboard that visualizes the intelligent routing of user queries across multiple specialized AI agents.
+OrchestAI is a highly dynamic, advanced multi-agent orchestration system built using the LangChain framework and the LLaMA 3.1 model (via Groq). Rather than treating every query identically, it features a sophisticated multi-stage routing system ensuring optimal speed, domain-specific accuracy, and persistent memory.
 
-The core goal of this project is to demonstrate a dynamic multi-agent pipeline where tasks are intelligently routed, researched using external tools, mathematically analyzed, and synthesized into a beautiful format for the user, fully equipped with conversational memory and document parsing capabilities.
-
-## Key Features
-
-- **Multi-Agent Pipeline**: 
-  - 🚦 **Supervisor Router**: Intelligently decides if a query needs quick research or deep complex multi-step reasoning.
-  - 🔎 **Research Agent**: Uses tools to gather facts, scrape the web, and evaluate math.
-  - 🧠 **Analysis Agent**: Breaks down research data and extracts deep logical insights.
-  - ✨ **Synthesis Agent**: Generates a strictly formatted, professional response for the user.
-- **Advanced Tool Integrations**:
-  - 🧮 **Math & Logic Solver**: Powered by the **SymPy** library to securely evaluate and solve complex algebra, calculus, and mathematical equations.
-  - 🌤️ **Real-time Weather**: Uses the **OpenWeather API** to pull live climate and geographical conditions dynamically.
-  - 🌐 **Web Search Toolkit**: Integrates the **DuckDuckGo Search API (`ddgs`)** to fetch real-time web snippet results for up-to-date knowledge facts.
-  - 📏 **Unit Converter**: Engineered using native Python logic and Regex to dynamically convert various physical measurements (e.g., distance, temperature, weight).
-  - 🕒 **Time Interface**: Uses Python's native `datetime` module to retrieve localized current time information, grounding the AI agent to the present.
-- **Rich Dashboard UI**: A fully functional browser GUI built with Python and modern web frameworks, featuring a glassmorphism aesthetic, active workspace tracking, and a live trace visualization of the agent pipeline.
-- **Document Knowledge Context**: Users can upload `.pdf`, `.docx`, `.xlsx`, `.csv`, and `.pptx` documents directly into the chat for agents to analyze.
+The core goal of this project is to demonstrate a dynamic multi-agent pipeline where tasks are intelligently routed, researched using external tools, mathematically analyzed, and synthesized into a beautiful format for the user, fully equipped with conversational memory and analytics.
 
 ---
 
-## Technologies Used
+## 🌟 Unique Dashboard Features
 
-- **AI & Orchestration**: Python, LLM frameworks, Large Language Models (LLM API Integrations), Vector Memory, Text Embeddings.
-- **Web App**: Python Web Server, Vanilla JavaScript, CSS3 (Glassmorphism), Markdown rendering.
-- **Core Integrations**: Live Weather API, Search Engine APIs.
-- **Data Science / Math**: Advanced numerical and data manipulation libraries.
-- **Document Parsers**: Comprehensive document extraction libraries.
-
----
-
-## Project Architecture
-
-Unlike a basic chatbot, OrchestAI runs a decision-based workflow:
-
-1. **User Input** arrives through the Web App UI.
-2. **Supervisor Router** classifies the query as `[RESEARCH]` (simple) or `[COMPLEX]`.
-3. **Research Agent** executes the `Zero-Shot ReAct` chain, repeatedly invoking tools (Calculator, Weather, Web Search) until the raw data is gathered.
-4. **Analysis & Synthesis Agents** (Only for Complex workflows) pass the raw data through sequential LLM chains to explain the *how* and *why* behind the answer.
-5. The final output is streamed back to the frontend along with the tools used, intelligently triggering Markdown parsers in the browser to display structured text.
+1. **📌 Pin (Starred Messages):** A "Save for Later" button for the AI's best answers. It saves critical messages to a special permanent side-panel so they are always one click away, no matter how many new messages you send.
+2. **⚡ Quick Prompt (Smart Routing):** The system instantly figures out what the user is asking and routes it to the right AI process without slowing down. It uses regex caching to completely bypass the heavy AI-router when handling obvious math or weather queries.
+3. **📚 Full History & Document Uploads:** A full workspace environment that extracts text from PDFs, Excel sheets, and Word Docs. Every conversation is saved into unique filterable workspaces, completely searchable by date, keywords, or the pipeline used.
+4. **📊 Analytics & Dashboard:** Built-in charts tracking AI performance. View metrics like Average Response Time, daily active chats, and pie charts showing the traffic distribution across different Agent Domains.
+5. **🧠 Neural Core Memory:** Allows the AI to permanently remember details about you across entirely different chat sessions. You can set rules in your persistent memory database, and the AI will reference them before answering.
 
 ---
 
-## Technical Deep-Dive
+## 🏗️ Step-by-Step AI Orchestration Workflow
 
-### 🧠 Intelligent Memory Management
-Instead of just passing a simple chat history, OrchestAI utilizes a hybrid memory system:
-- It maintains short-term conversational context natively so the agents remember the current topic during a single reasoning loop.
-- It leverages vector-based semantic search to mathematically convert past interactions into searchable memories. This allows the system to recall distant, relevant facts without overloading the AI's internal context window.
+This is what happens under the hood when a user hits "Send" inside the OrchestAI interface:
 
-### 📄 Multi-Format Document Parsing
-The dashboard accepts drag-and-drop document uploads. The backend (`app.py`) parses text directly from the attachment and injects it as context into the LLM's prompt. Supported formats:
-- **`.pdf`** (via PyPDF)
-- **`.docx`** (via python-docx)
-- **`.xlsx` / `.csv`** (via pandas)
-- **`.pptx`** (via python-pptx)
+**Step 1: The Gateway & Workspace**
+When the AI Chat interface loads, the backend executes several tasks:
+* Queries SQLite for available Workspaces, Pinned Messages, and Neural Core Memory variables.
+* Parses any uploaded files (PDF, DOCX, CSV, PPTX) and covertly injects their text into the prompt.
 
-### 🗄️ Workspace State Management
-All chats are saved via **SQLite3**. The backend maintains isolated histories for multiple workspaces, dynamically generating names for new workspaces using an LLM summary, and sorting them gracefully in the sidebar.
+**Step 2: The Fast-Lane (Keyword Pre-Routing)**
+The system runs lightning-fast Regex checks. If a prompt triggers `[TOOL]` or `[CONTENT]` patterns logically, it immediately bypasses the secondary AI Router, saving seconds of load time.
+
+**Step 3: The AI Router (Fallback Routing)**
+If regex fails, the **Router Agent** analyzes the intent and assigns one of 4 main pipelines: `SIMPLE`, `TOOL`, `CONTENT`, or `COMPLEX`.
+
+**Step 4: Pipeline Execution (The Engine)**
+Depending on the assigned tag, an army of agents takes over:
+*   `[SIMPLE]`: Disables all agents and queries the underlying LLM directly.
+*   `[TOOL]`: Activates the **Research Agent**. It uses LangChain's ZERO_SHOT_REACT_DESCRIPTION to write math equations, query OpenWeather API, or scrape DuckDuckGo.
+*   `[CONTENT]`: Triggers a debate loop. The **Content Agent** drafts text, the **Evaluator Agent** grades it, and if it fails, the **Optimizer Agent** rewrites it professionally.
+*   `[COMPLEX]`: Triggers the **UseCase Router** categorizing the query into domains (*Medical, Shopping, Debug, Decision, General*). 
+    * *Example:* A 3-part General question is split into 3 separate threads, researched in parallel, and merged.
+
+**Step 5: Review & Save**
+The **Summarizer Agent** cleans the chaotic research into beautiful Markdown. The **Confidence Agent** does a final check for accuracy. Finally, the raw input, text answer, tools used, and response time speeds are committed to the Langchain `shared_memory` and SQLite DB.
 
 ---
 
-## Installation and Setup
+## 🧠 System Components Breakdown
+
+### 🤖 The Language Model
+*   **Model:** `llama-3.1-8b-instant` connected via `ChatGroq`.
+
+### 🧰 Tools (5 Total)
+Assigned to the Research Agent for physical execution:
+1.  **Calculator:** Arithmetic and calculus via Python `sympy`.
+2.  **Weather:** Real-time metrics via OpenWeatherMap.
+3.  **Web Search:** Live duckduckgo search snippets.
+4.  **Unit Converter:** Convert Km, °C, Kg using Python.
+5.  **Time:** Live server clock and date.
+
+### 🧩 Intelligence Agents (16 Total)
+The framework consists of 16 specifically prompted Agents, including:
+*   **Routing Agents:** Top-Level Router, UseCase Router.
+*   **Execution Agent:** Research Agent.
+*   **Domain Experts:** Medical, Decision, Debug, Shopping, General, Analysis Agents.
+*   **Content Generators:** Content Agent, Email Agent, Summarizer Agent.
+*   **Quality Control Evaluators:** Confidence Agent, Refinement Agent, Evaluator Agent, Optimizer Agent.
+
+---
+
+## 💻 Installation and Setup
 
 ### 1. Clone the Repository
 ```bash
@@ -76,20 +80,18 @@ cd repository-name
 ### 2. Create a Virtual Environment
 ```bash
 python -m venv venv
+# Windows: venv\Scripts\activate
+# macOS/Linux: source venv/bin/activate
 ```
-Activate environment:
-- Windows: `venv\Scripts\activate`
-- macOS/Linux: `source venv/bin/activate`
 
 ### 3. Install Dependencies
 ```bash
 pip install -r requirements.txt
-# If no requirements.txt exists yet, install the core packages:
-pip install flask langchain langchain-groq requests python-dotenv duckduckgo-search sympy pypdf python-docx pandas python-pptx faiss-cpu sentence-transformers
 ```
+*(Packages include: flask, langchain, langchain-groq, duckduckgo-search, sympy, pypdf, python-docx, pandas, python-pptx, werkzeug)*
 
 ### 4. Configure API Keys
-Create a `.env` file in the project directory and insert your keys:
+Create a `.env` file in the project directory:
 ```ini
 GROQ_API_KEY=your_groq_key
 WEATHER_API_KEY=your_openweather_key
@@ -103,38 +105,35 @@ python app.py
 
 ---
 
-## Workspace Navigation (Examples)
+## 🔥 Query Testing Examples
 
-Try these queries inside your OrchestAI dashboard to see the routing system in real-time:
+Try these directly in the dashboard to watch the orchestrator switch pipelines:
 
-### 🟢 `[RESEARCH]` Pipeline (Simple Queries)
-*Designed to return exact answers quickly using specific tools.*
-- *"weather in Pune"*
-- *"who won the 2024 super bowl?"*
-- *"convert 100 kg to g"*
-
-### 🟣 `[COMPLEX]` Pipeline (Deep Reasoning)
-*Triggers the entire 4-stage pipeline resulting in formatted, detailed responses.*
-- *"calculate x^2 - 5x + 6 = 0 and explain the quadratic formula step by step"*
-- *"what are the current trends in artificial intelligence, write a highly detailed summary"*
-- *"draft a professional email to a recruiter explaining my expertise in python"*
+*   **⚡ Simple Pipeline:** `"Who discovered penicillin?"`
+*   **🛠️ Tool Pipeline:** `"Calculate 45 * 18.5 - (300 / 4)"` or `"What is the current weather in Tokyo?"`
+*   **✍️ Content Pipeline:** `"Draft a professional email to my client, Sarah, apologizing for the project delay."`
+*   **🧠 Complex (Medical):** `"What are the common symptoms of a migraine, and what are some over-the-counter treatments?"`
+*   **🧠 Complex (Debug):** `"Debug this error: Exception: IndexError: list index out of range at line 45."`
+*   **🧠 Complex (Multi-part General):** `"Explain how electric motors work, why they are more efficient than gas engines, and who the leading manufacturers are right now."`
 
 ---
 
-## System Structure
+## 📁 System Structure
 ```text
 /
-├── app.py              # Flask Web Server & Authentication
-├── orchestration.py    # Master Workflow Logic and Data Cleaning
-├── agents.py           # LLM Prompts and Agent Chain Definitions
-├── tools.py            # Custom Agent Tools (SymPy, Weather, DDG)
-├── memory.py           # FAISS Vector Memory implementation
-├── database.db         # SQLite Chat History and User tracking
+├── app.py              # Flask Server, Auth, Workspaces & DB Logic
+├── orchestration.py    # Master Workflow Logic, Domain Splitting, Regex Pre-Routing
+├── agents.py           # 16 LLM Agent Prompt Templates & Initialization
+├── tools.py            # 5 Custom Agent Tools (SymPy, Weather, DDG)
+├── memory.py           # LangChain Shared Memory Logic
+├── database.db         # SQLite User, Chat History, Memory tracking
 ├── static/
-│   ├── style.css       # Glassmorphism UI Styles
-│   └── script.js       # Frontend Pipeline Animations & Markdown
+│   ├── style.css       # Dashboards, Glassmorphism, Layouts
+│   └── script.js       # Frontend UI handling, badging, timers, markdown rendering
 └── templates/
-    ├── index.html      # Main Dashboard View
+    ├── index.html      # Main Chat Dashboard View
+    ├── analytics.html  # Live Charts and Distribution Graphics
+    ├── history.html    # Filterable Conversation Table Logs
     ├── login.html      # Authentication UI
     └── register.html   # Onboarding UI
 ```

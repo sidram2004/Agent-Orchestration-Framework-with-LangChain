@@ -1,0 +1,16 @@
+flask
+werkzeug
+langchain
+langchain-groq
+langchain-community
+faiss-cpu
+sentence-transformers
+pypdf
+python-docx
+pandas
+openpyxl
+python-pptx
+sympy
+duckduckgo-search
+requests
+python-dotenv

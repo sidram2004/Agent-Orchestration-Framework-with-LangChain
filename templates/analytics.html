@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics — OrchestAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { overflow: auto; height: auto; min-height: 100vh; display: block; }
+
+        /* ── Page wrapper ── */
+        .analytics-page {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 28px 28px 60px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Nav ── */
+        .a-nav {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 28px;
+        }
+        .a-brand {
+            display: flex; align-items: center; gap: 12px;
+            font-size: 1.05rem; font-weight: 600; color: var(--text-light);
+            text-decoration: none;
+        }
+        .a-nav-right { display: flex; gap: 10px; align-items: center; }
+        .a-nav-btn {
+            display: flex; align-items: center; gap: 7px;
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            color: var(--text-main); padding: 7px 16px;
+            border-radius: 8px; font-size: 0.83rem; cursor: pointer;
+            transition: all 0.2s; text-decoration: none;
+        }
+        .a-nav-btn:hover { border-color: var(--primary-neon); color: var(--primary-neon); }
+
+        /* ── Page title ── */
+        .a-title {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+        }
+        .a-title h1 {
+            font-size: 1.8rem; font-weight: 700; color: var(--text-light);
+            display: flex; align-items: center; gap: 14px;
+        }
+        .a-title p { font-size: 0.85rem; color: var(--text-main); margin-top: 4px; }
+        .live-badge {
+            display: flex; align-items: center; gap: 7px;
+            background: rgba(102,252,241,0.08);
+            border: 1px solid rgba(102,252,241,0.25);
+            color: var(--primary-neon);
+            padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600;
+        }
+
+        /* ── Metric cards ── */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .metric-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 22px 24px;
+            backdrop-filter: blur(16px);
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .metric-card:hover {
+            border-color: rgba(102,252,241,0.3);
+            box-shadow: 0 8px 32px rgba(102,252,241,0.06);
+        }
+        .metric-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, var(--primary-neon), transparent);
+            opacity: 0.6;
+        }
+        .metric-card.purple::before { background: linear-gradient(90deg, #a78bfa, transparent); }
+        .metric-card.yellow::before { background: linear-gradient(90deg, #fbbf24, transparent); }
+        .metric-card.green::before  { background: linear-gradient(90deg, #34d399, transparent); }
+        .metric-card.red::before    { background: linear-gradient(90deg, #f87171, transparent); }
+
+        .metric-icon {
+            position: absolute; top: 20px; right: 20px;
+            font-size: 1.4rem; opacity: 0.5;
+        }
+        .metric-icon.teal   { color: var(--primary-neon); }
+        .metric-icon.purple { color: #a78bfa; }
+        .metric-icon.yellow { color: #fbbf24; }
+        .metric-icon.green  { color: #34d399; }
+
+        .metric-label {
+            font-size: 0.72rem; text-transform: uppercase;
+            letter-spacing: 1.2px; color: var(--text-main); margin-bottom: 10px;
+        }
+        .metric-value {
+            font-size: 2.2rem; font-weight: 700; color: var(--text-light); line-height: 1;
+        }
+        .metric-value.teal   { color: var(--primary-neon); text-shadow: 0 0 20px rgba(102,252,241,0.3); }
+        .metric-value.purple { color: #a78bfa; }
+        .metric-sub {
+            font-size: 0.78rem; color: #4ade80;
+            margin-top: 8px; display: flex; align-items: center; gap: 5px;
+        }
+        .metric-sub.neutral { color: var(--text-main); }
+
+        /* ── Charts row ── */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        /* ── Glass card base ── */
+        .glass-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+        }
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 0.9rem; font-weight: 600; color: var(--text-light);
+            display: flex; align-items: center; gap: 9px;
+        }
+        .card-title i { color: var(--primary-neon); }
+        .chart-tabs {
+            display: flex; gap: 4px;
+        }
+        .chart-tab {
+            padding: 4px 12px; background: rgba(255,255,255,0.04);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px; font-size: 0.75rem; cursor: pointer;
+            color: var(--text-main); transition: all 0.2s;
+        }
+        .chart-tab.active {
+            background: rgba(102,252,241,0.15);
+            border-color: var(--primary-neon);
+            color: var(--primary-neon);
+        }
+
+        /* ── Bottom row ── */
+        .bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        /* ── System status ── */
+        .system-list { display: flex; flex-direction: column; gap: 10px; }
+        .system-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+        }
+        .sys-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        }
+        .sys-dot.online  { background: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.6); animation: pulsing 2s infinite; }
+        .sys-dot.standby { background: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+        .sys-name { flex: 1; font-size: 0.84rem; color: var(--text-light); }
+        .sys-status { font-size: 0.72rem; color: var(--text-main); }
+        .sys-badge {
+            font-size: 0.7rem; padding: 2px 8px; border-radius: 10px;
+            font-weight: 600;
+        }
+        .sys-badge.online  { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+        .sys-badge.standby { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+
+        /* ── Event log ── */
+        .event-log { display: flex; flex-direction: column; gap: 0; max-height: 260px; overflow-y: auto; }
+        .event-log::-webkit-scrollbar { width: 3px; }
+        .event-log::-webkit-scrollbar-thumb { background: rgba(102,252,241,0.2); border-radius: 4px; }
+        .event-row {
+            display: grid;
+            grid-template-columns: 90px 1fr auto auto;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.8rem;
+        }
+        .event-row:last-child { border-bottom: none; }
+        .event-user { color: var(--text-main); display: flex; align-items: center; gap: 6px; }
+        .event-user i { font-size: 0.7rem; }
+        .event-workspace { color: var(--text-light); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .event-time { color: var(--text-main); font-size: 0.72rem; white-space: nowrap; }
+        .event-badge {
+            padding: 2px 8px; border-radius: 10px;
+            font-size: 0.68rem; font-weight: 600;
+            border: 1px solid; white-space: nowrap;
+        }
+
+        /* ── Pipeline donut legend ── */
+        .donut-wrap {
+            display: flex; align-items: center; gap: 20px;
+        }
+        .donut-canvas { flex-shrink: 0; }
+        .donut-legend { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+        .legend-row {
+            display: flex; align-items: center; gap: 8px; font-size: 0.8rem;
+        }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .legend-label { flex: 1; color: var(--text-main); }
+        .legend-count { color: var(--text-light); font-weight: 600; }
+        .legend-pct { color: var(--text-main); font-size: 0.72rem; }
+
+        /* ── Full-width recent table ── */
+        .recent-table-wrap { overflow-x: auto; }
+        .recent-table {
+            width: 100%; border-collapse: collapse;
+        }
+        .recent-table th {
+            padding: 10px 14px; text-align: left;
+            font-size: 0.72rem; text-transform: uppercase;
+            letter-spacing: 0.8px; color: var(--text-main);
+            border-bottom: 1px solid var(--glass-border);
+            font-weight: 500;
+        }
+        .recent-table td {
+            padding: 11px 14px; font-size: 0.83rem;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            color: var(--text-light);
+        }
+        .recent-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .recent-table tr:last-child td { border-bottom: none; }
+        .td-user { display: flex; align-items: center; gap: 8px; color: var(--text-main); }
+        .td-user i { font-size: 0.8rem; }
+        .td-ws {
+            color: var(--primary-neon); font-size: 0.78rem;
+            background: rgba(102,252,241,0.07);
+            border: 1px solid rgba(102,252,241,0.15);
+            padding: 2px 9px; border-radius: 10px; white-space: nowrap;
+        }
+        .td-time { color: var(--text-main); font-size: 0.75rem; }
+        .td-speed { color: var(--secondary-neon); font-size: 0.78rem; }
+
+        /* badge colours */
+        .badge-simple   { border-color:rgba(74,222,128,0.4);  background:rgba(74,222,128,0.08);  color:#4ade80; }
+        .badge-tool     { border-color:rgba(251,191,36,0.4);  background:rgba(251,191,36,0.08);  color:#fbbf24; }
+        .badge-content  { border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.08); color:#a78bfa; }
+        .badge-medical  { border-color:rgba(248,113,113,0.4); background:rgba(248,113,113,0.08); color:#f87171; }
+        .badge-decision { border-color:rgba(96,165,250,0.4);  background:rgba(96,165,250,0.08);  color:#60a5fa; }
+        .badge-debug    { border-color:rgba(251,146,60,0.4);  background:rgba(251,146,60,0.08);  color:#fb923c; }
+        .badge-shopping { border-color:rgba(52,211,153,0.4);  background:rgba(52,211,153,0.08);  color:#34d399; }
+        .badge-general  { border-color:rgba(102,252,241,0.3); background:rgba(102,252,241,0.06); color:#66fcf1; }
+
+        @media (max-width: 900px) {
+            .metrics-grid { grid-template-columns: repeat(2,1fr); }
+            .charts-row   { grid-template-columns: 1fr; }
+            .bottom-row   { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-background" style="position:fixed;">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="analytics-page">
+
+        <!-- Nav -->
+        <nav class="a-nav">
+            <a href="/chat" class="a-brand">
+                <i class="fa-solid fa-microchip neon-icon icon-lg"></i> OrchestAI
+            </a>
+            <div class="a-nav-right">
+                <button class="a-nav-btn" id="btn-refresh"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                <a href="/history" class="a-nav-btn"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
+                <a href="/chat" class="a-nav-btn"><i class="fa-solid fa-arrow-left"></i> Back to Chat</a>
+                <button class="a-nav-btn" id="btn-theme-ana"><i class="fa-solid fa-moon"></i></button>
+            </div>
+        </nav>
+
+        <!-- Title -->
+        <div class="a-title">
+            <div>
+                <h1><i class="fa-solid fa-chart-line neon-icon"></i> System Analytics</h1>
+                <p>Live diagnostics and performance metrics for your OrchestAI deployment.</p>
+            </div>
+            <div class="live-badge">
+                <span class="dot pulse"></span> Live Data
+            </div>
+        </div>
+
+        <!-- Metric Cards -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <i class="fa-solid fa-server metric-icon teal"></i>
+                <div class="metric-label">System Status</div>
+                <div class="metric-value teal" style="font-size:1.4rem;margin-top:6px;">
+                    <span class="dot pulse" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--primary-neon);margin-right:8px;"></span>Online
+                </div>
+                <div class="metric-sub neutral">Llama-3.1-8b Engine</div>
+            </div>
+            <div class="metric-card purple">
+                <i class="fa-solid fa-users metric-icon purple"></i>
+                <div class="metric-label">Total Users</div>
+                <div class="metric-value" id="m-users">—</div>
+                <div class="metric-sub"><i class="fa-solid fa-arrow-up"></i> Registered accounts</div>
+            </div>
+            <div class="metric-card yellow">
+                <i class="fa-solid fa-folder-tree metric-icon yellow"></i>
+                <div class="metric-label">Active Workspaces</div>
+                <div class="metric-value" id="m-chats">—</div>
+                <div class="metric-sub"><i class="fa-solid fa-arrow-up"></i> Unique sessions</div>
+            </div>
+            <div class="metric-card green">
+                <i class="fa-solid fa-bolt metric-icon green"></i>
+                <div class="metric-label">Queries Processed</div>
+                <div class="metric-value" id="m-msgs">—</div>
+                <div class="metric-sub" id="m-avg"><i class="fa-solid fa-stopwatch"></i> avg response time</div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+            <!-- Bar chart: 7-day activity -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-chart-bar"></i> Agent Compute Volume
+                    </div>
+                    <div class="chart-tabs">
+                        <span class="chart-tab active" data-range="7">7D</span>
+                        <span class="chart-tab" data-range="30">30D</span>
+                    </div>
+                </div>
+                <canvas id="daily-chart" height="90"></canvas>
+            </div>
+
+            <!-- Donut: pipeline distribution -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-chart-pie"></i> Pipeline Distribution
+                    </div>
+                </div>
+                <div class="donut-wrap">
+                    <canvas id="dist-chart" width="140" height="140" class="donut-canvas"></canvas>
+                    <div class="donut-legend" id="donut-legend"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row -->
+        <div class="bottom-row">
+            <!-- System status -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fa-solid fa-microchip"></i> Agent Engine Status</div>
+                </div>
+                <div class="system-list">
+                    <div class="system-item">
+                        <span class="sys-dot online"></span>
+                        <span class="sys-name">Router Agent</span>
+                        <span class="sys-status">Llama-3.1-8b</span>
+                        <span class="sys-badge online">Online</span>
+                    </div>
+                    <div class="system-item">
+                        <span class="sys-dot online"></span>
+                        <span class="sys-name">Research Agent</span>
+                        <span class="sys-status">ReAct + Tools</span>
+                        <span class="sys-badge online">Online</span>
+                    </div>
+                    <div class="system-item">
+                        <span class="sys-dot online"></span>
+                        <span class="sys-name">Analysis Agent</span>
+                        <span class="sys-status">LLMChain</span>
+                        <span class="sys-badge online">Online</span>
+                    </div>
+                    <div class="system-item">
+                        <span class="sys-dot online"></span>
+                        <span class="sys-name">Medical Agent</span>
+                        <span class="sys-status">LLMChain</span>
+                        <span class="sys-badge online">Online</span>
+                    </div>
+                    <div class="system-item">
+                        <span class="sys-dot online"></span>
+                        <span class="sys-name">Debug Agent</span>
+                        <span class="sys-status">LLMChain</span>
+                        <span class="sys-badge online">Online</span>
+                    </div>
+                    <div class="system-item">
+                        <span class="sys-dot online"></span>
+                        <span class="sys-name">Vector Memory</span>
+                        <span class="sys-status">FAISS + MiniLM</span>
+                        <span class="sys-badge online">Online</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top workspaces -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fa-solid fa-fire"></i> Most Active Workspaces</div>
+                </div>
+                <div id="top-workspaces"></div>
+            </div>
+        </div>
+
+        <!-- Full-width event log -->
+        <div class="glass-card">
+            <div class="card-header">
+                <div class="card-title"><i class="fa-solid fa-terminal"></i> Live Pipeline Event Log</div>
+                <span style="font-size:0.75rem;color:var(--text-main);" id="log-count"></span>
+            </div>
+            <div class="recent-table-wrap">
+                <table class="recent-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Workspace</th>
+                            <th>Pipeline</th>
+                            <th>Response Time</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="event-log-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // ── Theme ────────────────────────────────────────────────────────
+        if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-mode');
+        document.getElementById('btn-theme-ana').addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+        });
+
+        // ── Helpers ───────────────────────────────────────────────────────
+        const isDark = () => !document.body.classList.contains('light-mode');
+        const textColor = () => isDark() ? '#c5c6c7' : '#4a4a4a';
+        const gridColor = () => isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
+        const PIPELINE_COLORS = {
+            SIMPLE:   '#4ade80', TOOL:    '#fbbf24', CONTENT: '#a78bfa',
+            MEDICAL:  '#f87171', DECISION:'#60a5fa', DEBUG:   '#fb923c',
+            SHOPPING: '#34d399', GENERAL: '#66fcf1',
+        };
+
+        function getBadgeClass(r) {
+            r = (r||'').toUpperCase();
+            if (r.includes('SIMPLE'))   return 'badge-simple';
+            if (r.includes('TOOL'))     return 'badge-tool';
+            if (r.includes('CONTENT'))  return 'badge-content';
+            if (r.includes('MEDICAL'))  return 'badge-medical';
+            if (r.includes('DECISION')) return 'badge-decision';
+            if (r.includes('DEBUG'))    return 'badge-debug';
+            if (r.includes('SHOPPING')) return 'badge-shopping';
+            return 'badge-general';
+        }
+
+        function getPipelineShort(r) {
+            // For distribution data: routing is already clean ("Simple", "Tool" etc)
+            // For recent log data: routing is full label like "[SIMPLE] Fast LLM"
+            if (!r) return 'General';
+            const up = r.toUpperCase();
+            if (up.includes('SIMPLE'))   return 'Simple';
+            if (up.includes('TOOL'))     return 'Tool';
+            if (up.includes('CONTENT'))  return 'Content';
+            if (up.includes('MEDICAL'))  return 'Medical';
+            if (up.includes('DECISION')) return 'Decision';
+            if (up.includes('DEBUG'))    return 'Debug';
+            if (up.includes('SHOPPING')) return 'Shopping';
+            if (up.includes('GENERAL'))  return 'General';
+            return r; // already clean label
+        }
+
+        function getPipelineColor(r) {
+            const key = getPipelineShort(r).toUpperCase();
+            return PIPELINE_COLORS[key] || '#66fcf1';
+        }
+
+        function timeAgo(tsStr) {
+            if (!tsStr) return '—';
+            const d    = new Date(tsStr);
+            const diff = Math.floor((Date.now() - d) / 1000);
+            if (diff < 60)    return `${diff}s ago`;
+            if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+            return d.toLocaleDateString();
+        }
+
+        // ── Chart instances ───────────────────────────────────────────────
+        let dailyChart, distChart;
+
+        // ── Load data ─────────────────────────────────────────────────────
+        async function loadAnalytics(days = 7) {
+            const res  = await fetch('/api/analytics');
+            const data = await res.json();
+
+            // Metric cards
+            document.getElementById('m-users').textContent = data.total_users || 0;
+            document.getElementById('m-chats').textContent = data.total_chats || 0;
+            document.getElementById('m-msgs').textContent  = data.total_messages || 0;
+            document.getElementById('m-avg').innerHTML =
+                `<i class="fa-solid fa-stopwatch"></i> ${data.avg_response_time || 0}s avg response`;
+
+            // ── Bar chart (daily) ─────────────────────────────────────────
+            const daily = data.daily || [];
+            if (dailyChart) dailyChart.destroy();
+            const dCtx = document.getElementById('daily-chart').getContext('2d');
+            const grad = dCtx.createLinearGradient(0, 0, 0, 200);
+            grad.addColorStop(0, 'rgba(102,252,241,0.5)');
+            grad.addColorStop(1, 'rgba(102,252,241,0.05)');
+            dailyChart = new Chart(dCtx, {
+                type: 'bar',
+                data: {
+                    labels: daily.map(d => {
+                        const dt = new Date(d.day);
+                        return dt.toLocaleDateString('en', { weekday:'short', month:'short', day:'numeric' });
+                    }),
+                    datasets: [{
+                        label: 'Queries',
+                        data: daily.map(d => d.cnt),
+                        backgroundColor: grad,
+                        borderColor: '#66fcf1',
+                        borderWidth: 1.5,
+                        borderRadius: 5,
+                        hoverBackgroundColor: 'rgba(102,252,241,0.7)',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(11,12,16,0.9)',
+                            borderColor: '#66fcf1', borderWidth: 1,
+                            titleColor: '#66fcf1', bodyColor: '#c5c6c7',
+                            padding: 10,
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: textColor(), font: { size: 11 } }, grid: { color: gridColor() } },
+                        y: { ticks: { color: textColor(), font: { size: 11 } }, grid: { color: gridColor() }, beginAtZero: true }
+                    }
+                }
+            });
+
+            // ── Donut chart (pipeline dist) ───────────────────────────────
+            const dist = data.distribution || [];
+            if (!dist.length) {
+                document.getElementById('donut-legend').innerHTML =
+                    '<p style="color:var(--text-main);font-size:0.82rem;text-align:center;padding:20px;">No pipeline data yet.<br>Start chatting to see distribution.</p>';
+            }
+            const labels = dist.map(d => d.routing || 'General');
+            const counts = dist.map(d => d.cnt);
+            const colors = dist.map(d => getPipelineColor(d.routing || ''));
+            const total  = counts.reduce((a,b) => a+b, 0);
+
+            if (distChart) distChart.destroy();
+            const pCtx = document.getElementById('dist-chart').getContext('2d');
+            distChart = new Chart(pCtx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: colors.map(c => c + '30'),
+                        borderColor: colors,
+                        borderWidth: 2,
+                        hoverBackgroundColor: colors.map(c => c + '60'),
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    cutout: '68%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(11,12,16,0.9)',
+                            borderColor: 'rgba(102,252,241,0.3)', borderWidth: 1,
+                            titleColor: '#fff', bodyColor: '#c5c6c7', padding: 10,
+                        }
+                    }
+                }
+            });
+
+            // Donut legend
+            const legendEl = document.getElementById('donut-legend');
+            legendEl.innerHTML = labels.map((lbl, i) => `
+                <div class="legend-row">
+                    <span class="legend-dot" style="background:${colors[i]};"></span>
+                    <span class="legend-label">${lbl}</span>
+                    <span class="legend-count">${counts[i]}</span>
+                    <span class="legend-pct">${total ? Math.round(counts[i]/total*100) : 0}%</span>
+                </div>`).join('');
+
+            // ── Top workspaces ────────────────────────────────────────────
+            const topWsData = data.top_workspaces || [];
+            // fallback: compute from recent if top_workspaces not in response
+            let topWs = topWsData.length
+                ? topWsData.map(r => [r.chat_id, r.cnt])
+                : (() => {
+                    const m = {};
+                    (data.recent || []).forEach(r => { m[r.chat_id] = (m[r.chat_id]||0)+1; });
+                    return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,6);
+                  })();
+            const maxWs = topWs[0]?.[1] || 1;
+            document.getElementById('top-workspaces').innerHTML = topWs.length
+                ? topWs.map(([ws, cnt]) => `
+                    <div style="margin-bottom:10px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span style="font-size:0.82rem;color:var(--text-light);">${ws}</span>
+                            <span style="font-size:0.75rem;color:var(--text-main);">${cnt} queries</span>
+                        </div>
+                        <div style="height:5px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;">
+                            <div style="height:100%;width:${Math.round(cnt/maxWs*100)}%;background:linear-gradient(90deg,#66fcf1,#45a29e);border-radius:4px;transition:width 0.8s ease;"></div>
+                        </div>
+                    </div>`).join('')
+                : '<p style="color:var(--text-main);font-size:0.83rem;text-align:center;padding:20px;">No data yet.</p>';
+
+            // ── Event log ─────────────────────────────────────────────────
+            const recent = data.recent || [];
+            document.getElementById('log-count').textContent = `${recent.length} recent events`;
+            document.getElementById('event-log-body').innerHTML = recent.map(r => `
+                <tr>
+                    <td><div class="td-user"><i class="fa-solid fa-user-astronaut"></i>${r.username}</div></td>
+                    <td><span class="td-ws">${r.chat_id}</span></td>
+                    <td>
+                        <span class="event-badge ${getBadgeClass(r.routing)}" style="border:1px solid;">
+                            ${getPipelineShort(r.routing)}
+                        </span>
+                    </td>
+                    <td><span class="td-speed">⏱ ${r.response_time || 0}s</span></td>
+                    <td><span class="td-time">${timeAgo(r.timestamp)}</span></td>
+                </tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--text-main);padding:24px;">No events yet. Start chatting!</td></tr>`;
+        }
+
+        // ── Chart tab toggle ──────────────────────────────────────────────
+        document.querySelectorAll('.chart-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                loadAnalytics(parseInt(this.dataset.range));
+            });
+        });
+
+        // ── Refresh ───────────────────────────────────────────────────────
+        document.getElementById('btn-refresh').addEventListener('click', () => {
+            document.getElementById('btn-refresh').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refreshing';
+            loadAnalytics().then(() => {
+                document.getElementById('btn-refresh').innerHTML = '<i class="fa-solid fa-rotate-right"></i> Refresh';
+            });
+        });
+
+        // ── Auto-refresh every 30s ────────────────────────────────────────
+        loadAnalytics();
+        setInterval(loadAnalytics, 30000);
+    });
+    </script>
+</body>
+</html>
