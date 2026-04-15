@@ -1,7 +1,7 @@
 import requests
 import os
 from datetime import datetime
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from sympy import symbols, solve, simplify, diff, integrate, sympify, Eq
 from dotenv import load_dotenv
 
