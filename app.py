@@ -10,8 +10,11 @@ from pptx import Presentation
 from orchestration import run_workflow
 from agents import TOOLS
 
+print("[Startup] Initializing Flask app...")
 app = Flask(__name__)
 app.secret_key = "orchest_ai_secret_2024"
+
+print("[Startup] App created. Registering routes...")
 
 
 @app.template_global()
