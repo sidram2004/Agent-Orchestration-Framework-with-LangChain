@@ -14,18 +14,10 @@ import time
 from agents import create_agents
 from memory import create_shared_memory
 
-# Change to Lazy Loading to prevent Render timeout
-AGENTS = None
-shared_memory = None
-
-def get_orchestration_components():
-    global AGENTS, shared_memory
-    if AGENTS is None:
-        print("[Orchestration] First run: Loading agents and memory...")
-        AGENTS = create_agents()
-        shared_memory = create_shared_memory()
-        print("[Orchestration] All components loaded.")
-    return AGENTS, shared_memory
+print("[Orchestration] Loading agents...")
+AGENTS = create_agents()
+shared_memory = create_shared_memory()
+print("[Orchestration] All agents ready.")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -333,9 +325,6 @@ def run_workflow(user_input: str, is_new_chat: bool = False, core_memory: str = 
     Main orchestration entry point.
     Returns: { answer, routing, tools_used, email, suggested_name? }
     """
-    global AGENTS, shared_memory
-    AGENTS, shared_memory = get_orchestration_components()
-
     try:
         # Load memory context
         memory_data    = shared_memory.load_memory_variables({"input": user_input})
