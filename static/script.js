@@ -647,6 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="trace-header">Routing to agent pipeline...</div>
             <ul class="trace-list">
                 <li class="step active"><i class="fa-solid fa-route"></i> Supervisor analyzing <span class="dot pulse" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--primary-neon);margin-left:6px;"></span></li>
+                <li class="step" style="font-size: 0.75rem; opacity: 0.7; margin-top: 4px;">(First run may take a moment to initialize AI models)</li>
             </ul>`;
         chatFlow.appendChild(loadingTrace);
         scrollToBottom();
@@ -702,7 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error(err);
             loadingTrace.remove();
-            addAiResponse('Connection error. Please check the server and try again.');
+            addAiResponse('⚠️ **Connection Timeout/Error**: The server is taking a long time to respond (likely downloading AI models for the first time). <br><br>Please **wait 1 minute** and then try sending your message again. The models will stay loaded once they finish!');
             scrollToBottom();
         }
     });
