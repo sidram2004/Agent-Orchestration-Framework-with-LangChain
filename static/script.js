@@ -636,7 +636,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeItem = document.querySelector(`.chat-item[data-chat-id="${currentChatId}"]`);
         if (activeItem) chatHistoryList.prepend(activeItem);
 
-        addUserMessage(msg);
+        const fileName = pdfUpload?.files[0] ? pdfUpload.files[0].name : null;
+        addUserMessage(msg, null, fileName);
         userInput.value = '';
         scrollToBottom();
 
@@ -752,15 +753,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── DOM helpers ───────────────────────────────────────────────────────
-    function addUserMessage(text, id = null) {
+    function addUserMessage(text, id = null, fileName = null) {
         const div = document.createElement('div');
         div.className = 'message user-message slide-in';
         if (id) div.setAttribute('data-msg-id', id);
+        
+        let fileHTML = "";
+        if (fileName) {
+            fileHTML = `<div class="attached-file-badge"><i class="fa-solid ${getFileIcon(fileName)}"></i> ${fileName}</div>`;
+        }
+
         div.innerHTML = `
             <div class="avatar user-avatar"><i class="fa-solid fa-user-astronaut"></i></div>
             <div class="message-content glass-pill">
                 <div class="msg-text-container">
-                    <p class="msg-text">${text}</p>
+                    <div class="msg-content-wrapper">
+                        ${fileHTML}
+                        <p class="msg-text">${text}</p>
+                    </div>
                     <div class="msg-actions">
                         <i class="fa-solid fa-pen-to-square edit-btn" title="Edit"></i>
                         <i class="fa-solid fa-thumbtack pin-btn" title="Pin" data-pinned="0"></i>

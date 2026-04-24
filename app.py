@@ -3,6 +3,7 @@ import functools
 import time as time_module
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
+import os
 from pypdf import PdfReader
 import docx
 import pandas as pd
@@ -10,8 +11,18 @@ from pptx import Presentation
 from orchestration import run_workflow
 from agents import TOOLS
 
+def get_file_icon(filename):
+    if not filename: return "fa-file-lines"
+    ext = filename.split('.')[-1].lower()
+    return {
+        'pdf': 'fa-file-pdf', 'docx': 'fa-file-word', 'doc': 'fa-file-word',
+        'xlsx': 'fa-file-excel', 'xls': 'fa-file-excel', 'csv': 'fa-file-csv',
+        'pptx': 'fa-file-powerpoint', 'txt': 'fa-file-lines'
+    }.get(ext, 'fa-file-lines')
+
 app = Flask(__name__)
 app.secret_key = "orchest_ai_secret_2024"
+app.jinja_env.globals.update(get_file_icon=get_file_icon)
 
 
 @app.template_global()
@@ -65,6 +76,7 @@ def init_db():
             ("chats",  "response_time", "REAL DEFAULT 0"),
             ("chats",  "pinned",        "INTEGER DEFAULT 0"),
             ("chats",  "timestamp",     "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+            ("chats",  "filename",      "TEXT DEFAULT NULL"),
         ]
         for table, col, col_type in migrations:
             try:
@@ -87,7 +99,7 @@ def get_user_memory_context(username):
     except Exception as e:
         print(f"[Memory Fetch Error] {e}")
         return ""
-
+#extracting text from files
 
 def extract_text_from_file(file):
     name = file.filename.lower()
@@ -160,19 +172,30 @@ def logout():
 def chat_interface():
     current_chat = request.args.get('chat_id', 'Chat 1')
     db = get_db()
-    rows = db.execute("""SELECT chat_id, MAX(id) as last_id FROM chats
-        WHERE username=? GROUP BY chat_id ORDER BY last_id DESC LIMIT 20""", (session['user'],)).fetchall()
-    chat_list = [r["chat_id"] for r in rows] or ["Chat 1"]
+    # Updated query to check for files in the workspace
+    rows = db.execute("""
+        SELECT chat_id, MAX(id) as last_id, 
+        MAX(CASE WHEN filename IS NOT NULL THEN 1 ELSE 0 END) as has_file
+        FROM chats
+        WHERE username=? GROUP BY chat_id ORDER BY last_id DESC LIMIT 20
+    """, (session['user'],)).fetchall()
     
-    # Ensure current workspace is at the top
-    if current_chat in chat_list:
-        chat_list.remove(current_chat)
-    chat_list.insert(0, current_chat)
+    chat_list = [{"id": r["chat_id"], "has_file": bool(r["has_file"])} for r in rows]
+    if not chat_list:
+        chat_list = [{"id": "Chat 1", "has_file": False}]
     
-    # Strictly limit to top 6 for "minimum" history look
+    # Ensure current workspace is in the list and at the top
+    chat_list = [c for c in chat_list if c["id"] != current_chat]
+    # Check if current chat has a file
+    current_has_file = db.execute("SELECT 1 FROM chats WHERE username=? AND chat_id=? AND filename IS NOT NULL LIMIT 1",
+                                (session['user'], current_chat)).fetchone()
+    chat_list.insert(0, {"id": current_chat, "has_file": bool(current_has_file)})
+    
     chat_list = chat_list[:6]
+    
+    # Update history query to include filename column
     history   = db.execute(
-        "SELECT id, message, response, routing, response_time, pinned FROM chats WHERE username=? AND chat_id=? ORDER BY id",
+        "SELECT id, message, response, routing, response_time, pinned, filename FROM chats WHERE username=? AND chat_id=? ORDER BY id",
         (session['user'], current_chat)).fetchall()
     user = db.execute("SELECT language FROM users WHERE username=?", (session['user'],)).fetchone()
     try:
@@ -190,6 +213,7 @@ def send_message():
     chat_id    = request.form['chat_id']
     user_input = request.form.get('message', '').strip()
     db = get_db()
+    doc_text = ""
     if 'pdf' in request.files and request.files['pdf'].filename:
         file     = request.files['pdf']
         doc_text = extract_text_from_file(file)
@@ -197,15 +221,14 @@ def send_message():
         db.execute("INSERT INTO uploaded_files (username, chat_id, filename, filetype) VALUES (?,?,?,?)",
                    (session['user'], chat_id, file.filename, ext))
         db.commit()
-        if doc_text:
-            user_input = f"{user_input}\n\n[Document: {file.filename}]\n{doc_text}"
 
     count = db.execute("SELECT COUNT(*) as c FROM chats WHERE username=? AND chat_id=?",
                        (session['user'], chat_id)).fetchone()['c']
 
     t_start = time_module.time()
     mem_ctx = get_user_memory_context(session['user'])
-    result  = run_workflow(user_input, is_new_chat=(count == 0), core_memory=mem_ctx)
+    # Added chat_id to support persistent document memory
+    result  = run_workflow(user_input, is_new_chat=(count == 0), core_memory=mem_ctx, doc_text=doc_text, chat_id=chat_id)
     elapsed = round(time_module.time() - t_start, 2)
 
     ai_resp    = result.get("answer", "")
@@ -213,9 +236,12 @@ def send_message():
     tools_used = result.get("tools_used", [])
     suggested  = result.get("suggested_name")
 
+    # Capture filename for this specific message
+    fname = request.files['pdf'].filename if 'pdf' in request.files and request.files['pdf'].filename else None
+
     cursor = db.execute(
-        "INSERT INTO chats (chat_id, username, message, response, routing, response_time) VALUES (?,?,?,?,?,?)",
-        (chat_id, session['user'], user_input, ai_resp, routing, elapsed))
+        "INSERT INTO chats (chat_id, username, message, response, routing, response_time, filename) VALUES (?,?,?,?,?,?,?)",
+        (chat_id, session['user'], user_input, ai_resp, routing, elapsed, fname))
     db.commit()
 
     return jsonify({"id": cursor.lastrowid, "message": user_input, "answer": ai_resp,
@@ -522,7 +548,7 @@ def api_history():
     ).fetchone()['c']
 
     rows = db.execute(
-        f"""SELECT id, chat_id, message, response, routing, response_time, pinned, timestamp
+        f"""SELECT id, chat_id, message, response, routing, response_time, pinned, timestamp, filename
             FROM chats WHERE {where_clause}
             ORDER BY id DESC LIMIT ? OFFSET ?""",
         params + [per_page, offset]

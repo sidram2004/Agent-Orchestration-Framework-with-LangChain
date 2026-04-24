@@ -2140,3 +2140,9 @@ body.light-mode .modal-input {
         transform: translateX(0);
     }
 }
+.attached-file-badge { display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(102, 252, 241, 0.2); padding: 10px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 0.85rem; color: var(--text-bright); transition: all 0.3s ease; cursor: default; max-width: fit-content; }
+.attached-file-badge i { font-size: 1.1rem; color: var(--primary-neon); }
+.attached-file-badge:hover { background: rgba(102, 252, 241, 0.1); border-color: var(--primary-neon); }
+.file-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(102, 252, 241, 0.1); border: 1px solid var(--primary-neon); padding: 6px 12px; border-radius: 8px; margin-bottom: 10px; font-size: 0.8rem; color: var(--text-bright); }
+.remove-file { cursor: pointer; opacity: 0.6; transition: opacity 0.2s; margin-left: 4px; }
+.msg-content-wrapper { display: flex; flex-direction: column; }

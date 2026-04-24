@@ -106,12 +106,12 @@ Body:
     # 5. Top-Level Router
     router_agent = LLMChain(llm=llm, prompt=PromptTemplate(
         input_variables=["input"],
-        template="""You are a Task Routing Supervisor. Classify into EXACTLY ONE:
-
-[SIMPLE]   - Direct answer, no tools needed
-[TOOL]     - Needs a tool: math, weather, time, unit conversion, search
-[CONTENT]  - Creative/writing: email, essay, story, code
-[COMPLEX]  - Multi-step analysis requiring deep reasoning
+        template="""You are a Task Routing Supervisor. Classify the user's intent into EXACTLY ONE:
+[DOC]      - Query related to an uploaded document, file, or PDF context.
+[SIMPLE]   - Direct answer, small talk, or general facts,no tools needed.
+[TOOL]     - Needs a tool: math, weather, time,web search,unit conversion,or any tool.
+[CONTENT]  - Creative/writing: email, essay, story, code generation.
+[COMPLEX]  - Multi-step analysis requiring deep reasoning.
 
 Respond with ONLY the tag.
 

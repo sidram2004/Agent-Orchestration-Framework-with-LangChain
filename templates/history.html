@@ -374,6 +374,15 @@
         let activeId      = null;
 
         // ── Helpers ───────────────────────────────────────────────────────
+        function getFileIcon(name) {
+            if (!name) return 'fa-file-lines';
+            const ext = name.split('.').pop().toLowerCase();
+            return {
+                pdf: 'fa-file-pdf', docx: 'fa-file-word', doc: 'fa-file-word',
+                xlsx: 'fa-file-excel', xls: 'fa-file-excel', pptx: 'fa-file-powerpoint', csv: 'fa-file-csv'
+            }[ext] || 'fa-file-lines';
+        }
+
         function getBadgeClass(r) {
             r = (r||'').toUpperCase();
             if (r.includes('SIMPLE'))   return 'badge-simple';
@@ -517,7 +526,12 @@
                     <!-- User message -->
                     <div class="h-msg-row user-row">
                         <div class="h-avatar user"><i class="fa-solid fa-user"></i></div>
-                        <div class="h-bubble user">${escHtml(row.message||'')}</div>
+                        <div class="h-bubble user">
+                            <div class="msg-content-wrapper">
+                                ${row.filename ? `<div class="attached-file-badge"><i class="fa-solid ${getFileIcon(row.filename)}"></i> <span>${row.filename}</span></div>` : ''}
+                                ${escHtml(row.message||'')}
+                            </div>
+                        </div>
                     </div>
                     <!-- AI response -->
                     <div class="h-msg-row">

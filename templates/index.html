@@ -53,10 +53,10 @@
                 <div class="section-title">History</div>
                 <div id="chat-history-list">
                     {% for c in chat_list %}
-                    <a href="/chat?chat_id={{c}}" style="text-decoration:none;color:inherit;">
-                        <div class="chat-item {{ 'active' if c == current_chat else '' }}" data-chat-id="{{ c }}">
+                    <a href="/chat?chat_id={{c.id}}" style="text-decoration:none;color:inherit;">
+                        <div class="chat-item {{ 'active' if c.id == current_chat else '' }}" data-chat-id="{{ c.id }}">
                             <i class="fa-regular fa-message"></i>
-                            <span>{{ c }}</span>
+                            <span class="chat-name-text">{{ c.id }}</span>
                             <i class="fa-solid fa-trash delete-chat hover-red"
                                onclick="event.preventDefault();window.location.href='/delete_chat/{{c}}'"></i>
                         </div>
@@ -125,7 +125,15 @@
                     <div class="avatar user-avatar"><i class="fa-solid fa-user-astronaut"></i></div>
                     <div class="message-content glass-pill">
                         <div class="msg-text-container">
-                            <p class="msg-text">{{ row.message }}</p>
+                            <div class="msg-content-wrapper">
+                                {% if row.filename %}
+                                <div class="attached-file-badge">
+                                    <i class="fa-solid {{ get_file_icon(row.filename) }}"></i>
+                                    <span>{{ row.filename }}</span>
+                                </div>
+                                {% endif %}
+                                <p class="msg-text">{{ row.message }}</p>
+                            </div>
                             <div class="msg-actions">
                                 <i class="fa-solid fa-pen-to-square edit-btn" title="Edit"></i>
                                 <i class="fa-solid fa-thumbtack pin-btn {{ 'pinned-active' if row.pinned else '' }}"

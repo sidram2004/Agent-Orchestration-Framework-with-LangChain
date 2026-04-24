@@ -12,7 +12,7 @@ Execution paths:
 import re
 import time
 from agents import create_agents
-from memory import create_shared_memory
+from memory import create_shared_memory, create_doc_retriever
 
 print("[Orchestration] Loading agents...")
 AGENTS = create_agents()
@@ -320,26 +320,20 @@ def pipeline_complex(user_input: str, combined_input: str):
 
 # ── Main Entry Point ──────────────────────────────────────────────────────────
 
-def run_workflow(user_input: str, is_new_chat: bool = False, core_memory: str = "") -> dict:
+def run_workflow(user_input: str, is_new_chat: bool = False, core_memory: str = "", doc_text: str = "", chat_id: str = None) -> dict:
     """
     Main orchestration entry point.
-    Returns: { answer, routing, tools_used, email, suggested_name? }
+    Matches your Diagram: Query -> Semantic Search -> Local FAISS Database (Persistent) -> LLM
     """
     try:
         # Load memory context
         memory_data    = shared_memory.load_memory_variables({"input": user_input})
         history        = memory_data.get("history", "")
         
-        # Combined context for research/complex agents
-        combined_input = f"{core_memory}\nPrevious Context:\n{history}\n\nUser Query:\n{user_input}"
-        
-        # Primary input for simple/direct agents
-        agent_input = f"{core_memory}\n{user_input}"
-
-        # Step 1: Fast keyword pre-routing (no LLM call needed)
+        # Step 1: Fast keyword pre-routing
         routing_raw = keyword_route(user_input)
 
-        # Step 2: LLM router only if keyword routing was unclear
+        # Step 2: LLM router
         if routing_raw is None:
             try:
                 routing_raw = AGENTS["router"].invoke({"input": user_input})["text"].strip().upper()
@@ -349,8 +343,29 @@ def run_workflow(user_input: str, is_new_chat: bool = False, core_memory: str = 
 
         print(f"[Router] '{user_input[:60]}' -> {routing_raw}")
 
-        # Step 3: Execute correct pipeline
-        if   "[SIMPLE]"  in routing_raw:
+        # Step 3: --- Intelligent RAG (ChatGPT Style) ---
+        doc_context = ""
+        # Only search if a new file was uploaded OR the Router detected a document query
+        if doc_text or "[DOC]" in routing_raw:
+            print(f"[Orchestration] Document context required. Searching FAISS...")
+            retriever = create_doc_retriever(doc_text, chat_id=chat_id)
+            if retriever:
+                docs = retriever.get_relevant_documents(user_input)
+                doc_context = "\n### RELEVANT DOCUMENT EXCERPTS ###\n" + \
+                              "\n---\n".join([d.page_content for d in docs])
+        
+        # Combined context for research/complex agents
+        combined_input = f"{core_memory}\n{doc_context}\nPrevious Context:\n{history}\n\nUser Query:\n{user_input}"
+        
+        # Primary input for simple/direct agents
+        agent_input = f"{core_memory}\n{doc_context}\n{user_input}"
+
+        # Step 4: Execute correct pipeline
+        if   "[DOC]"     in routing_raw:
+            # If it's a doc query, we use the complex research pipeline for high accuracy
+            final_output, tools_used, routing_label = pipeline_general(user_input, combined_input)
+            routing_label = "[DOC] Semantic RAG Search"
+        elif "[SIMPLE]"  in routing_raw:
             final_output, tools_used, routing_label = pipeline_simple(agent_input)
         elif "[TOOL]"    in routing_raw:
             final_output, tools_used, routing_label = pipeline_tool(user_input, combined_input)
