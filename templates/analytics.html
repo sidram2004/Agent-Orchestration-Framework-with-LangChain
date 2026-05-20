@@ -502,7 +502,11 @@
 
         function timeAgo(tsStr) {
             if (!tsStr) return '—';
-            const d    = new Date(tsStr);
+            // Replace space with 'T' for ISO 8601 compliance in JS Date parsing
+            const cleanTs = tsStr.includes(' ') ? tsStr.replace(' ', 'T') : tsStr;
+            const d    = new Date(cleanTs);
+            if (isNaN(d.getTime())) return tsStr; // Fallback to raw string if parsing fails
+            
             const diff = Math.floor((Date.now() - d) / 1000);
             if (diff < 60)    return `${diff}s ago`;
             if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;

@@ -38,11 +38,20 @@ def weather_tool(query):
     try:
         import re
         api_key = os.getenv("WEATHER_API_KEY")
-        query = query.lower()
-        match = re.search(r"(?:weather\s*(?:in)?\s*)?([a-zA-Z\s]+)", query)
-        if not match:
+        query = query.lower().strip()
+        
+        # Extract city from queries like "weather in mumbai" or just "mumbai"
+        if "weather" in query:
+            match = re.search(r"weather\s+(?:in\s+|for\s+)?([a-z\s]+)", query)
+            if match:
+                city = match.group(1).strip()
+            else:
+                city = query.replace("weather", "").strip()
+        else:
+            city = query
+            
+        if not city:
             return "City not found"
-        city = match.group(1).strip()
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
         response = requests.get(url)
         data = response.json()
@@ -86,6 +95,65 @@ def unit_converter(query):
         return "Invalid conversion"
 
 
-def current_time(_):
-    """Return current time."""
-    return datetime.now().strftime("%H:%M:%S — %A, %d %B %Y")
+def current_time(query):
+    """Return current time for any city or country using timezone offset."""
+    from datetime import datetime, timedelta, timezone
+
+    # Map country names to capitals to avoid API ambiguity (e.g., "Poland" -> Poland, Maine, USA)
+    COUNTRY_CAPITALS = {
+        "poland": "warsaw", "germany": "berlin", "france": "paris", "uk": "london",
+        "united kingdom": "london", "italy": "rome", "spain": "madrid", "canada": "ottawa",
+        "australia": "canberra", "japan": "tokyo", "china": "beijing", "russia": "moscow",
+        "india": "new delhi", "brazil": "brasilia", "mexico": "mexico city", "egypt": "cairo",
+        "south africa": "pretoria", "turkey": "ankara", "netherlands": "amsterdam",
+        "switzerland": "bern", "sweden": "stockholm", "norway": "oslo", "portugal": "lisbon",
+        "greece": "athens", "austria": "vienna", "belgium": "brussels", "thailand": "bangkok",
+        "vietnam": "hanoi", "singapore": "singapore", "malaysia": "kuala lumpur",
+        "indonesia": "jakarta", "philippines": "manila", "south korea": "seoul",
+        "usa": "new york", "united states": "new york", "america": "new york",
+        "pakistan": "islamabad", "bangladesh": "dhaka", "sri lanka": "colombo",
+        "nigeria": "lagos", "kenya": "nairobi", "iran": "tehran", "iraq": "baghdad",
+        "saudi arabia": "riyadh", "uae": "dubai", "united arab emirates": "dubai",
+        "ukraine": "kyiv", "argentina": "buenos aires", "colombia": "bogota",
+        "chile": "santiago", "denmark": "copenhagen", "finland": "helsinki",
+        "romania": "bucharest", "hungary": "budapest", "czech republic": "prague",
+    }
+
+    query = str(query).lower().strip()
+    city = None
+
+    # Extract city/country name from query
+    if " in " in query:
+        city = query.split(" in ")[-1].strip()
+    elif "of " in query:
+        city = query.split(" of ")[-1].strip()
+    elif query and query != "time":
+        city = query
+
+    # Map country name to its capital for accurate timezone lookup
+    if city and city in COUNTRY_CAPITALS:
+        city = COUNTRY_CAPITALS[city]
+
+    # Fetch timezone offset via OpenWeatherMap and calculate local time
+    if city:
+        try:
+            api_key = os.getenv("WEATHER_API_KEY")
+            url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}"
+            response = requests.get(url, timeout=5)
+            data = response.json()
+
+            if response.status_code == 200:
+                offset = data.get("timezone", 0)
+                utc_now = datetime.now(timezone.utc)
+                local_time = utc_now + timedelta(seconds=offset)
+
+                city_name = data.get("name", city.title())
+                country = data.get("sys", {}).get("country", "")
+                fmt_time = local_time.strftime("%I:%M:%S %p — %A, %d %B %Y")
+
+                return f"Current time in {city_name}, {country}: {fmt_time} (UTC{offset/3600:+.1f})"
+        except Exception as e:
+            print(f"[Time Tool API Error] {e}")
+
+    # Fallback: return local server time
+    return datetime.now().strftime("Local Server Time: %I:%M:%S %p — %A, %d %B %Y")

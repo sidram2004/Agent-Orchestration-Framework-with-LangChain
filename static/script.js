@@ -659,7 +659,26 @@ document.addEventListener('DOMContentLoaded', () => {
             if (pdfUpload?.files.length) fd.append('pdf', pdfUpload.files[0]);
 
             const response = await fetch('/send_message', { method: 'POST', body: fd });
+
+            // Detect session expiry: server redirects to login page (returns HTML)
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                // Session expired — redirect to login
+                loadingTrace.remove();
+                showToast('⏰ Session expired. Redirecting to login...', 'warn');
+                setTimeout(() => { window.location.href = '/login'; }, 1500);
+                return;
+            }
+
             const data = await response.json();
+
+            // Handle server-side errors (500 etc.)
+            if (!response.ok) {
+                loadingTrace.remove();
+                addAiResponse(`⚠️ Server error (${response.status}): ${data.error || data.answer || 'Unknown error. Please try again.'}`);
+                scrollToBottom();
+                return;
+            }
 
             const lastUser = chatFlow.querySelector('.user-message:last-of-type');
             if (lastUser && data.id) lastUser.setAttribute('data-msg-id', data.id);
@@ -701,9 +720,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (err) {
-            console.error(err);
+            console.error('[Send Message Error]', err);
             loadingTrace.remove();
-            addAiResponse('Connection error. Please check the server and try again.');
+            addAiResponse('⚠️ Network error. Please check your internet connection and try again.');
             scrollToBottom();
         }
     });
@@ -739,6 +758,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const fd = new FormData(); fd.append('msg_id', msgId); fd.append('message', newText);
         try {
             const res = await fetch('/edit_message', { method: 'POST', body: fd });
+            const ct = res.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) {
+                glassPill.innerHTML = fallbackHTML;
+                showToast('⏰ Session expired. Redirecting to login...', 'warn');
+                setTimeout(() => { window.location.href = '/login'; }, 1500);
+                return;
+            }
             const data = await res.json();
             if (data.success) {
                 glassPill.innerHTML = `<div class="msg-text-container"><p class="msg-text">${newText}</p><div class="msg-actions"><i class="fa-solid fa-pen-to-square edit-btn" title="Edit"></i><i class="fa-solid fa-thumbtack pin-btn" title="Pin" data-pinned="0"></i></div></div>`;
@@ -748,8 +774,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     aiRow.querySelector('.message-content').innerHTML = typeof marked !== 'undefined' ? marked.parse(data.new_response) : data.new_response;
                     aiRow.style.animation = 'none'; void aiRow.offsetWidth; aiRow.style.animation = 'flashText 1s ease';
                 }
-            } else { alert("Error updating message."); glassPill.innerHTML = fallbackHTML; }
-        } catch (err) { console.error(err); alert("Connection error."); glassPill.innerHTML = fallbackHTML; }
+            } else { showToast('❌ Error updating message.', 'error'); glassPill.innerHTML = fallbackHTML; }
+        } catch (err) { console.error('[Edit Error]', err); showToast('⚠️ Network error. Please try again.', 'warn'); glassPill.innerHTML = fallbackHTML; }
     }
 
     // ── DOM helpers ───────────────────────────────────────────────────────

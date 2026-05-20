@@ -1,7 +1,8 @@
 import sqlite3
 import functools
 import time as time_module
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory, g
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 from pypdf import PdfReader
@@ -10,6 +11,7 @@ import pandas as pd
 from pptx import Presentation
 from orchestration import run_workflow
 from agents import TOOLS
+from memory import rename_vector_db
 
 def get_file_icon(filename):
     if not filename: return "fa-file-lines"
@@ -39,9 +41,17 @@ def get_badge_class(routing: str) -> str:
 
 
 def get_db():
-    conn = sqlite3.connect("database.db")
-    conn.row_factory = sqlite3.Row
-    return conn
+    if 'db' not in g:
+        g.db = sqlite3.connect("database.db", timeout=20)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(error):
+    db = getattr(g, 'db', None)
+    if db is not None:
+        db.close()
 
 
 def login_required(f):
@@ -54,36 +64,42 @@ def login_required(f):
 
 
 def init_db():
-    with get_db() as db:
-        # Create tables if they don't exist
-        db.execute("""CREATE TABLE IF NOT EXISTS users(
-            id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT)""")
-        db.execute("""CREATE TABLE IF NOT EXISTS chats(
-            id INTEGER PRIMARY KEY, chat_id TEXT, username TEXT,
-            message TEXT, response TEXT)""")
-        db.execute("""CREATE TABLE IF NOT EXISTS user_memory(
-            id INTEGER PRIMARY KEY, username TEXT, memory_key TEXT UNIQUE,
-            memory_value TEXT, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
-        db.execute("""CREATE TABLE IF NOT EXISTS uploaded_files(
-            id INTEGER PRIMARY KEY, username TEXT, chat_id TEXT,
-            filename TEXT, filetype TEXT, uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    # Use a separate connection for initialization to avoid app-context issues at startup
+    conn = sqlite3.connect("database.db", timeout=20)
+    conn.row_factory = sqlite3.Row
+    try:
+        with conn as db:
+            # Create tables if they don't exist
+            db.execute("""CREATE TABLE IF NOT EXISTS users(
+                id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS chats(
+                id INTEGER PRIMARY KEY, chat_id TEXT, username TEXT,
+                message TEXT, response TEXT)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS user_memory(
+                id INTEGER PRIMARY KEY, username TEXT, memory_key TEXT UNIQUE,
+                memory_value TEXT, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS uploaded_files(
+                id INTEGER PRIMARY KEY, username TEXT, chat_id TEXT,
+                filename TEXT, filetype TEXT, uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
 
-        # Migrate existing tables — safely add new columns if missing
-        migrations = [
-            ("users",  "language",      "TEXT DEFAULT 'en'"),
-            ("users",  "created_at",    "DATETIME DEFAULT CURRENT_TIMESTAMP"),
-            ("chats",  "routing",       "TEXT DEFAULT ''"),
-            ("chats",  "response_time", "REAL DEFAULT 0"),
-            ("chats",  "pinned",        "INTEGER DEFAULT 0"),
-            ("chats",  "timestamp",     "DATETIME DEFAULT CURRENT_TIMESTAMP"),
-            ("chats",  "filename",      "TEXT DEFAULT NULL"),
-        ]
-        for table, col, col_type in migrations:
-            try:
-                db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
-            except Exception:
-                pass  # Column already exists — skip
-        db.commit()
+            # Migrate existing tables — safely add new columns if missing
+            migrations = [
+                ("users",  "language",      "TEXT DEFAULT 'en'"),
+                ("users",  "created_at",    "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+                ("chats",  "routing",       "TEXT DEFAULT ''"),
+                ("chats",  "response_time", "REAL DEFAULT 0"),
+                ("chats",  "pinned",        "INTEGER DEFAULT 0"),
+                ("chats",  "timestamp",     "DATETIME DEFAULT (DATETIME('now', 'localtime'))"),
+                ("chats",  "filename",      "TEXT DEFAULT NULL"),
+            ]
+            for table, col, col_type in migrations:
+                try:
+                    db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+                except Exception:
+                    pass  # Column already exists — skip
+            db.commit()
+    finally:
+        conn.close()
 
 init_db()
 
@@ -239,9 +255,10 @@ def send_message():
     # Capture filename for this specific message
     fname = request.files['pdf'].filename if 'pdf' in request.files and request.files['pdf'].filename else None
 
+    now_ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     cursor = db.execute(
-        "INSERT INTO chats (chat_id, username, message, response, routing, response_time, filename) VALUES (?,?,?,?,?,?,?)",
-        (chat_id, session['user'], user_input, ai_resp, routing, elapsed, fname))
+        "INSERT INTO chats (chat_id, username, message, response, routing, response_time, filename, timestamp) VALUES (?,?,?,?,?,?,?,?)",
+        (chat_id, session['user'], user_input, ai_resp, routing, elapsed, fname, now_ts))
     db.commit()
 
     return jsonify({"id": cursor.lastrowid, "message": user_input, "answer": ai_resp,
@@ -254,12 +271,18 @@ def send_message():
 def edit_message():
     msg_id  = request.form['msg_id']
     new_text = request.form['message']
+    
+    db = get_db()
+    chat_row = db.execute("SELECT chat_id FROM chats WHERE id=? AND username=?", (msg_id, session['user'])).fetchone()
+    chat_id = chat_row['chat_id'] if chat_row else "default"
+    
     t_start = time_module.time()
     mem_ctx = get_user_memory_context(session['user'])
-    result  = run_workflow(new_text, is_new_chat=False, core_memory=mem_ctx)
+    # Pass chat_id so regenerate maintains document memory
+    result  = run_workflow(new_text, is_new_chat=False, core_memory=mem_ctx, chat_id=chat_id)
     elapsed = round(time_module.time() - t_start, 2)
     new_resp = result.get("answer", "")
-    db = get_db()
+
     try:
         db.execute("UPDATE chats SET message=?, response=?, routing=?, response_time=? WHERE id=? AND username=?",
                    (new_text, new_resp, result.get("routing",""), elapsed, msg_id, session['user']))
@@ -277,8 +300,13 @@ def rename_workspace():
     old_id, new_id = request.form['old_id'], request.form['new_id']
     db = get_db()
     try:
+        # 1. Update the chat history in SQLite
         db.execute("UPDATE chats SET chat_id=? WHERE username=? AND chat_id=?", (new_id, session['user'], old_id))
         db.commit()
+        
+        # 2. Rename the FAISS vector database folder (if it exists)
+        rename_vector_db(old_id, new_id)
+        
         return jsonify({"success": True, "new_id": new_id})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

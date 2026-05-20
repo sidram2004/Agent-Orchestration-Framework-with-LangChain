@@ -409,7 +409,10 @@
         // Group by date like ChatGPT
         function getDateGroup(tsStr) {
             if (!tsStr) return 'Older';
-            const d    = new Date(tsStr);
+            const cleanTs = tsStr.includes(' ') ? tsStr.replace(' ', 'T') : tsStr;
+            const d    = new Date(cleanTs);
+            if (isNaN(d.getTime())) return 'Older';
+
             const now  = new Date();
             const diff = Math.floor((now - d) / 86400000);
             if (diff === 0)         return 'Today';

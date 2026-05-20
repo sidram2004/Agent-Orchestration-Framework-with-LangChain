@@ -19,20 +19,27 @@ TOOLS = [
     Tool(name="Weather",        func=weather_tool,   description="Real-time weather for any city. Never guess weather."),
     Tool(name="Web Search",     func=web_search,     description="Search the web for facts, news, general knowledge."),
     Tool(name="Unit Converter", func=unit_converter, description="Convert units: km to m, C to F, kg to g, etc."),
-    Tool(name="Time",           func=current_time,   description="Get the current date and time."),
+    Tool(name="Time",           func=current_time,   description="Get the current date and time. If asking for a specific city, pass the city name as the input."),
 ]
 
 RESEARCH_PREFIX = """
 You are a highly intelligent AI Research Agent.
 
-CORE RULES:
-1. For math/equations -> Use Calculator tool.
-2. For weather -> Use Weather tool ONLY.
+**CRITICAL DOCUMENT RULE (HIGHEST PRIORITY):**
+If you see "### RELEVANT DOCUMENT EXCERPTS ###" in your input:
+1. First, check if the user query is about the document. If it is, answer ONLY based on those excerpts.
+2. If the user query is NOT about the document (e.g., weather, generic facts, math) AND the excerpts are irrelevant, you MUST use your TOOLS or general knowledge.
+3. NEVER guess if info is in the document; if it's clearly not there, proceed to your tools.
+4. Focus on the ACTUAL CONTENT in the excerpts, not what a file type is in general.
+
+CORE RULES FOR NON-DOCUMENT QUERIES:
+1. For math/equations -> Use Calculator tool. For simple calculations directly give the result is use say give step by step then give steps.
+2. For weather -> Use Weather tool ONLY .
 3. For unit conversions -> Use Unit Converter tool.
 4. For current time -> Use Time tool.
 5. For latest news/prices/unknown facts -> Use Web Search tool.
-6. For well-known facts (capitals, definitions, history) -> Answer DIRECTLY without tools.
-7. NEVER use a tool if you already know the answer.
+6. For well-known facts (capitals, definitions, history) WITHOUT document context -> Answer DIRECTLY without tools.
+7. NEVER use a tool if you already know the answer AND there is NO document context.
 8. Be BRIEF for simple queries. Return only the result.
 9. ALWAYS end your response with "Final Answer:" followed by the result.
 10. If you decide no tool is needed, immediately write: Final Answer: [your answer]
@@ -41,7 +48,6 @@ CORE RULES:
 If provided, use the facts in this block to personalize your search and answers. 
 Always respect user names, preferences, and recurring context saved here.
 """
-
 
 def create_agents():
     llm = get_llm()
@@ -107,11 +113,25 @@ Body:
     router_agent = LLMChain(llm=llm, prompt=PromptTemplate(
         input_variables=["input"],
         template="""You are a Task Routing Supervisor. Classify the user's intent into EXACTLY ONE:
-[DOC]      - Query related to an uploaded document, file, or PDF context.
-[SIMPLE]   - Direct answer, small talk, or general facts,no tools needed.
-[TOOL]     - Needs a tool: math, weather, time,web search,unit conversion,or any tool.
-[CONTENT]  - Creative/writing: email, essay, story, code generation.
-[COMPLEX]  - Multi-step analysis requiring deep reasoning.
+
+[DOC]      - ANY question about an uploaded/existing document, file, PDF, Word, Excel, PowerPoint.
+             Examples: "what is this word file", "summarize the document", "tell me about this report", 
+             "what's in the file", "give detailed about this doc", "tell me short about report",
+             "what is in above word file", "define report related to", "what is project name in report"
+             
+[SIMPLE]   - Direct answer, small talk, general facts (NOT about uploaded documents).
+             Examples: "hi", "who is Einstein", "what is photosynthesis", "capital of France"
+             
+[TOOL]     - Needs a tool: math, weather, time, web search, unit conversion.
+             Examples: "2+2", "weather in London", "current time", "convert 5km to m", "search for Tesla stock"
+             
+[CONTENT]  - Creative/writing tasks: email, essay, story, code generation.
+             Examples: "write an email to...", "create a story about...", "generate Python code for..."
+             
+[COMPLEX]  - Multi-step analysis requiring deep reasoning or domain expertise.
+             Examples: "compare options A vs B", "debug this code", "medical advice for..."
+
+**IMPORTANT**: If the user mentions "file", "document", "report", "uploaded", "above", "this doc", "word file", "pdf" -> ALWAYS choose [DOC]
 
 Respond with ONLY the tag.
 

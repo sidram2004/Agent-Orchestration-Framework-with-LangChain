@@ -12,11 +12,22 @@ Execution paths:
 import re
 import time
 from agents import create_agents
-from memory import create_shared_memory, create_doc_retriever
+from memory import create_shared_memory, create_doc_retriever, has_vector_db
 
 print("[Orchestration] Loading agents...")
 AGENTS = create_agents()
-shared_memory = create_shared_memory()
+# Isolated memory registry to prevent cross-chat data leakage
+MEMORY_REGISTRY = {}
+
+def get_chat_memory(chat_id):
+    if not chat_id:
+        from memory import create_shared_memory
+        return create_shared_memory()
+    if chat_id not in MEMORY_REGISTRY:
+        from memory import create_shared_memory
+        MEMORY_REGISTRY[chat_id] = create_shared_memory()
+    return MEMORY_REGISTRY[chat_id]
+
 print("[Orchestration] All agents ready.")
 
 
@@ -119,13 +130,46 @@ TOOL_PATTERNS = [
     r"\b(calculate|solve|equation|integral|derivative|simplify)\b",
     r"\b(\d+[\s]*[\+\-\*\/\^]\s*\d+)\b",
     r"\b(convert|km to|miles to|celsius|fahrenheit|kg to|lbs)\b",
-    r"\b(current time|what time|what's the time)\b",
+    r"\b(current time|what time|what's the time|time in|time)\b",
     r"\b(search for|look up|find me|news about|latest)\b",
 ]
 
 CONTENT_PATTERNS = [
     r"\b(write|draft|compose|create|generate)\b.*(email|letter|essay|story|blog|post|poem|code|script|report)\b",
     r"\b(email|essay|story|blog post|cover letter|poem)\b.*(write|draft|create|compose|generate)\b",
+]
+
+DOC_PATTERNS = [
+    # File type mentions
+    r"\b(document|pdf|file|report|presentation|doc|docx|word|excel|xlsx|powerpoint|pptx)\b",
+    
+    # Reference patterns — must explicitly point to an uploaded file
+    r"\b(uploaded|above file|this file|that file|current file|my file|the file)\b",
+    r"\b(above|this|that|the)\s+(doc|document|report|file|pdf|word|excel)\b",
+    r"\bin (above|this|the|my|that) file\b",
+    r"\bfrom (above|this|the|my|that) file\b",
+    r"\bin above\b",
+    r"\bfrom above\b",
+    
+    # Content-based patterns — must reference the document explicitly
+    r"\b(based on the text|in the context|from the doc|in this report|in the document)\b",
+    
+    # Action + document patterns — must say "file/doc/report" explicitly
+    r"\b(tell me about|summarize|what is in|give details about|explain|analyze)\b.*(file|doc|report|document|pdf|word)\b",
+    r"\b(what|tell|give|show|explain|define)\b.*(about|in|from)?\s*(this|the|above|my)\s+(file|doc|document|report|word file|pdf)\b",
+    
+    # Direct question patterns about uploaded files
+    r"what is (this|the|above|my) (file|doc|document|report|word|pdf)",
+    r"tell me (about|short about|detailed about) (this|the|above|my) (file|doc|report|word|document)",
+    r"give (detailed|summary|details|information) (about|of|from)? (this|the|above) (file|doc|report)",
+    r"what('s| is) in (the|this|above|my) (file|doc|document|report|word)",
+    r"(define|explain) (this |the |)?report",
+    r"what is project name",
+    r"tell me short about report",
+    r"give detailed about",
+    r"give summary of",
+    r"\b(explain|summarize|tell me about)\b.*\b(chapter|section|part)\b",
+    r"\b(chapter|section|part)\b\s*\d+",
 ]
 
 COMPLEX_PATTERNS = [
@@ -142,15 +186,24 @@ def keyword_route(text: str) -> str | None:
     Returns routing tag or None if unclear.
     """
     t = text.lower().strip()
+    
+    # Priority 1: Clear Tool Matches (Weather, Time, etc.)
+    for p in TOOL_PATTERNS:
+        if re.search(p, t, re.IGNORECASE):
+            return "[TOOL]"
+            
+    # Priority 2: Clear Document Matches
+    for p in DOC_PATTERNS:
+        if re.search(p, t, re.IGNORECASE):
+            return "[DOC]"
+            
+    # Priority 3: Other patterns
     for p in SIMPLE_PATTERNS:
         if re.search(p, t, re.IGNORECASE):
             return "[SIMPLE]"
     for p in CONTENT_PATTERNS:
         if re.search(p, t, re.IGNORECASE):
             return "[CONTENT]"
-    for p in TOOL_PATTERNS:
-        if re.search(p, t, re.IGNORECASE):
-            return "[TOOL]"
     for p in COMPLEX_PATTERNS:
         if re.search(p, t, re.IGNORECASE):
             return "[COMPLEX]"
@@ -167,6 +220,66 @@ def pipeline_simple(user_input: str):
 # ── Pipeline: TOOL ────────────────────────────────────────────────────────────
 
 def pipeline_tool(user_input: str, combined_input: str):
+    from tools import weather_tool, current_time, calculator, unit_converter, web_search
+    import re
+    
+    t_input = user_input.lower().strip()
+    
+    # Fast path for Weather
+    if t_input.startswith("weather in ") or t_input.startswith("weather for ") or t_input.startswith("weather "):
+        city = t_input.replace("weather in ", "").replace("weather for ", "").replace("weather ", "").strip()
+        if city and city not in ["what", "the", "is", "like", "current"]:
+            res = weather_tool(city)
+            if "not found" not in res.lower() and "unavailable" not in res.lower():
+                return res, [{"tool": "Weather", "tool_input": city, "observation": res}], "[TOOL] Fast Weather Match"
+
+    # Fast path for Time
+    if "time in" in t_input or "time of" in t_input or t_input in ["time", "current time", "what time is it"]:
+        res = current_time(t_input)
+        return res, [{"tool": "Time", "tool_input": t_input, "observation": res}], "[TOOL] Fast Time Match"
+
+    # Fast path for Math/Calculator
+    math_keywords = ["calculate", "solve", "equation", "integral", "derivative", "simplify"]
+    is_math = any(t_input.startswith(kw) for kw in math_keywords) or re.search(r"\b(\d+[\s]*[\+\-\*\/\^]\s*\d+)\b", t_input)
+    if is_math:
+        clean_expr = t_input
+        for kw in math_keywords:
+            clean_expr = clean_expr.replace(kw, "")
+        clean_expr = clean_expr.strip()
+        
+        if clean_expr:
+            res = calculator(clean_expr)
+            if not res.startswith("Error"):
+                # Make the output look nice
+                formatted_output = f"### Calculation Result\n**Expression:** `{clean_expr}`\n**Result:** `{res}`"
+                return formatted_output, [{"tool": "Calculator", "tool_input": clean_expr, "observation": res}], "[TOOL] Fast Math Match"
+
+    # Fast path for Unit Converter
+    convert_keywords = ["convert", "km to", "miles to", "celsius", "fahrenheit", "kg to", "lbs", " to ", " in "]
+    is_convert = any(kw in t_input for kw in convert_keywords) and bool(re.search(r"\d", t_input))
+    if is_convert:
+        res = unit_converter(t_input)
+        if "Invalid" not in res and "not supported" not in res:
+            return f"### Conversion Result\n**Input:** `{user_input}`\n**Result:** `{res}`", [{"tool": "Converter", "tool_input": user_input, "observation": res}], "[TOOL] Fast Converter Match"
+
+    # Fast path for Web Search
+    search_keywords = ["search for", "look up", "find me", "news about", "latest", "search "]
+    is_search = any(t_input.startswith(kw) for kw in search_keywords)
+    if is_search:
+        clean_query = t_input
+        for kw in search_keywords:
+            if clean_query.startswith(kw):
+                clean_query = clean_query[len(kw):].strip()
+                break
+        
+        if clean_query:
+            res = web_search(clean_query)
+            if "Search failed" not in res:
+                # Use LLM to format the raw search results
+                formatted = invoke_llm(f"Format these search results nicely using Markdown for the query '{clean_query}':\n\n{res}")
+                return formatted, [{"tool": "Web Search", "tool_input": clean_query, "observation": res}], "[TOOL] Fast Search Match"
+
+    # Default logic (fallback)
     output, tools = run_research(combined_input)
     # If research returned nothing useful, fall back to direct LLM
     if not output or len(output.strip()) < 3:
@@ -263,6 +376,52 @@ def pipeline_shopping(user_input: str, combined_input: str):
     return final, tools, "[COMPLEX->SHOPPING] Search -> Prices -> Reviews -> Merge"
 
 
+# ── Pipeline: DOC ─────────────────────────────────────────────────────────────
+
+def pipeline_doc(user_input: str, doc_context: str):
+    """Pipeline specifically for document questions, avoiding confusion with chat history."""
+    try:
+        # Check if we actually have document context
+        if not doc_context or "### RELEVANT DOCUMENT EXCERPTS ###" not in doc_context:
+            # No document found - inform user
+            return ("I don't see any uploaded document in this conversation. Please upload a document first, "
+                   "then ask your question about it."), [], "[DOC] No Document Found"
+
+        # Detect broad explanation queries — skip the summarizer to avoid compressing real content
+        broad_keywords = ["explain", "detail", "summarize", "summary", "describe", "overview",
+                          "tell me about", "what is in", "give details", "full report", "complete"]
+        is_broad = any(kw in user_input.lower() for kw in broad_keywords)
+
+        prompt = f"""You are a Document Analysis Expert.
+Your task is to answer the user's query based STRICTLY on the document excerpts provided below.
+Do NOT use outside knowledge. Focus on the ACTUAL CONTENT in the excerpts.
+
+{doc_context}
+
+User Query: {user_input}
+
+{"IMPORTANT: This is a broad explanation request. Provide a COMPREHENSIVE, STRUCTURED answer covering ALL major topics, sections, and details found in the excerpts. Use ## headers and bullet points. Do NOT say 'more information is needed' — analyze what is provided." if is_broad else "Provide a focused, accurate answer based only on the document content above."}
+
+Document Analysis & Answer:"""
+
+        # 1. Direct LLM generation with full context
+        general_output = invoke_llm(prompt)
+
+        # 2. For specific/narrow queries: format via summarizer. For broad: return direct (richer) output.
+        if is_broad:
+            final_output = general_output
+        else:
+            final_output = AGENTS["summarizer"].invoke({"input": general_output})["text"]
+
+        return final_output, [], "[DOC] Semantic RAG Search"
+    except Exception as e:
+        print(f"[Pipeline Doc Error] {e}")
+        if doc_context:
+            summary = invoke_llm(f"Answer the query based on the document context.\n\nQuery: {user_input}\nContext: {doc_context[:1500]}")
+            return summary, [], "[DOC] Semantic RAG Search (fallback)"
+        else:
+            return "Error processing document. Please try uploading the file again.", [], "[DOC] Error"
+
 # ── Pipeline: GENERAL ─────────────────────────────────────────────────────────
 
 def pipeline_general(user_input: str, combined_input: str):
@@ -326,8 +485,17 @@ def run_workflow(user_input: str, is_new_chat: bool = False, core_memory: str = 
     Matches your Diagram: Query -> Semantic Search -> Local FAISS Database (Persistent) -> LLM
     """
     try:
-        # Load memory context
-        memory_data    = shared_memory.load_memory_variables({"input": user_input})
+        # Load memory context specifically for this chat_id
+        chat_memory = get_chat_memory(chat_id)
+        
+        # If it's a new chat, we might want to clear the memory
+        if is_new_chat:
+            try:
+                chat_memory.clear()
+            except AttributeError:
+                pass
+
+        memory_data    = chat_memory.load_memory_variables({"input": user_input})
         history        = memory_data.get("history", "")
         
         # Step 1: Fast keyword pre-routing
@@ -343,28 +511,75 @@ def run_workflow(user_input: str, is_new_chat: bool = False, core_memory: str = 
 
         print(f"[Router] '{user_input[:60]}' -> {routing_raw}")
 
-        # Step 3: --- Intelligent RAG (ChatGPT Style) ---
+        # Step 3: Load document context if this workspace has a document
         doc_context = ""
-        # Only search if a new file was uploaded OR the Router detected a document query
-        if doc_text or "[DOC]" in routing_raw:
-            print(f"[Orchestration] Document context required. Searching FAISS...")
-            retriever = create_doc_retriever(doc_text, chat_id=chat_id)
+        session_has_db = has_vector_db(chat_id)
+
+        # TOOL queries (weather, math, time) never need the document
+        is_tool_query = "[TOOL]" in routing_raw
+
+        if not is_tool_query:
+            from memory import load_doc_retriever as _ldr
+            # If new file uploaded this message, create/update the DB
+            # Use overwrite=is_new_chat to ensure a fresh DB for new chats
+            if doc_text:
+                retriever = create_doc_retriever(doc_text, chat_id=chat_id, overwrite=is_new_chat)
+            # If workspace already has a document DB, always load it
+            elif session_has_db:
+                retriever = _ldr(chat_id)
+            else:
+                retriever = None
+
             if retriever:
                 docs = retriever.get_relevant_documents(user_input)
-                doc_context = "\n### RELEVANT DOCUMENT EXCERPTS ###\n" + \
-                              "\n---\n".join([d.page_content for d in docs])
-        
-        # Combined context for research/complex agents
+
+                # ── Fallback: vague follow-up questions return 0 chunks ──────
+                # If semantic search finds nothing (e.g. "tell me more", "explain"),
+                # retry with a generic broad query so doc context is never lost.
+                if not docs and session_has_db:
+                    FALLBACK_QUERIES = [
+                        "overview summary key points main topics",
+                        "introduction conclusion findings results",
+                        "data analysis model methodology",
+                    ]
+                    for fq in FALLBACK_QUERIES:
+                        docs = retriever.get_relevant_documents(fq)
+                        if docs:
+                            print(f"[RAG] Fallback retrieval succeeded with query: '{fq}' ({len(docs)} chunks)")
+                            break
+
+                if docs:
+                    doc_context = "\n### RELEVANT DOCUMENT EXCERPTS ###\n" + \
+                                  "\n---\n".join([d.page_content for d in docs])
+                    print(f"[RAG] Retrieved {len(docs)} chunks for: '{user_input[:50]}'")
+                else:
+                    print("[RAG] Retriever returned 0 chunks (even after fallback)")
+            else:
+                if session_has_db:
+                    print("[RAG] WARNING: session has DB but retriever failed to load")
+                else:
+                    print("[RAG] No document in this workspace")
+
+        # Step 3b: Decide routing
+        # If workspace has a document AND doc_context was loaded AND user is NOT asking
+        # something clearly unrelated (tool/weather/math) → route to [DOC]
+        # If user asks something clearly unrelated → keep original route, ignore doc context
+        UNRELATED_TO_DOC = ["[TOOL]", "[CONTENT]"]
+        if doc_context and not any(tag in routing_raw for tag in UNRELATED_TO_DOC):
+            # Document context available — always answer from document
+            routing_raw = "[DOC]"
+            print(f"[Router] Doc context available → forcing [DOC]")
+        elif not doc_context and "[DOC]" in routing_raw:
+            # Router said DOC but we have no document — give a clear message
+            print(f"[Router] [DOC] route but no doc_context — will show 'no document' message")
+
+        # Combined context for all agents
         combined_input = f"{core_memory}\n{doc_context}\nPrevious Context:\n{history}\n\nUser Query:\n{user_input}"
-        
-        # Primary input for simple/direct agents
         agent_input = f"{core_memory}\n{doc_context}\n{user_input}"
 
-        # Step 4: Execute correct pipeline
         if   "[DOC]"     in routing_raw:
-            # If it's a doc query, we use the complex research pipeline for high accuracy
-            final_output, tools_used, routing_label = pipeline_general(user_input, combined_input)
-            routing_label = "[DOC] Semantic RAG Search"
+            # Bypass ReAct agent to prevent it from web-searching generic file terms
+            final_output, tools_used, routing_label = pipeline_doc(user_input, doc_context)
         elif "[SIMPLE]"  in routing_raw:
             final_output, tools_used, routing_label = pipeline_simple(agent_input)
         elif "[TOOL]"    in routing_raw:
@@ -382,9 +597,9 @@ def run_workflow(user_input: str, is_new_chat: bool = False, core_memory: str = 
         if not final_output or len(final_output.strip()) < 3:
             final_output = invoke_llm(user_input)
 
-        # Step 4: Save context
+        # Step 4: Save context to the session-specific memory
         try:
-            shared_memory.save_context(
+            chat_memory.save_context(
                 {"input": user_input},
                 {"output": final_output[:1000]}
             )
