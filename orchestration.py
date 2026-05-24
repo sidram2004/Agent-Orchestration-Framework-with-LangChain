@@ -441,6 +441,7 @@ def pipeline_general(user_input: str, combined_input: str):
             part_data, part_tools = run_research(sq)
             parts.append(f"**{sq}**\n{part_data}")
             tools.extend(part_tools)
+            
         research_data = "\n\n".join(parts)
     else:
         routing_suffix = "Direct Analysis -> Merge"

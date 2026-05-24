@@ -24,6 +24,13 @@ def get_file_icon(filename):
 
 app = Flask(__name__)
 app.secret_key = "orchest_ai_secret_2024"
+
+# Critical for Hugging Face Spaces: Allows login cookies to work inside their iframe
+app.config.update(
+    SESSION_COOKIE_SAMESITE='None',
+    SESSION_COOKIE_SECURE=True
+)
+
 app.jinja_env.globals.update(get_file_icon=get_file_icon)
 
 

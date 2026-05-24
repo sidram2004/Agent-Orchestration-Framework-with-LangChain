@@ -1,233 +1,156 @@
-# 🤖 OrchestAI: Advanced Agent Orchestration Framework With langchain
+---
+title: Agent Orchestration Framework with LangChain
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+license: mit
+---
 
-## 📌 Project Overview
+# 🤖 Agent Orchestration Framework with LangChain
 
-OrchestAI is a highly dynamic, advanced **multi-agent orchestration system** built using LangChain and the LLaMA 3.1 model (via Groq).
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![LangChain](https://img.shields.io/badge/🦜🔗-LangChain-black)](https://python.langchain.com/)
 
-Unlike traditional chatbots, this system uses:
-
-* Intelligent routing
-* Multi-agent collaboration
-* Tool-based execution
-* Persistent memory
-
-It transforms a simple chatbot into a **scalable AI system capable of real-world problem solving**.
+**Created by Sidram Patil**
 
 ---
 
-# 📍 Project Development Milestones
+## 📌 1. What is the Agent Orchestration Framework? (The Basics)
 
-The project was developed in **four structured phases**, evolving from a basic agent to a full orchestration system.
+At its core, the **Agent Orchestration Framework** is a highly dynamic, advanced multi-agent orchestration system. It is built using Python, the LangChain framework, and the lightning-fast LLaMA 3.1 model (powered by Groq).
 
----
+Most standard AI chatbots have a major flaw: they suffer from "amnesia" (forgetting who you are), they cannot search the live internet, they cannot do complex math, and they treat every single question the exact same way. 
 
-## 🔹 Milestone 1: Basic Agent Development
-
-* Set up Python and LangChain environment
-* Explored LLMs, Prompts, Chains, and Agents
-* Built a single-agent conversational system
-* Implemented prompt templates
-* Created console-based interaction
-
-✅ **Result:** Basic AI agent responding to queries
+This framework solves this by transforming a simple chat interface into a **scalable AI platform capable of real-world problem-solving**. Instead of one AI trying to do everything, this system acts as a manager that routes your question to a team of **16 specialized AI agents** equipped with real-world tools.
 
 ---
 
-## 🔹 Milestone 2: Tool Integration
+## 🚀 2. Core Features (From Basic to Advanced)
 
-* Integrated tools:
+### 📄 Multi-modal Document RAG System
+If you upload a file (PDF, Word, Excel, CSV, PowerPoint, or Text), the backend instantly intercepts it. Using specialized Python libraries (`pypdf`, `python-docx`, `pandas`, `python-pptx`), the system physically extracts the text and securely injects it into the AI’s prompt. This allows you to chat directly with your documents and data instantly.
 
-  * Calculator (SymPy)
-  * Weather API
-  * Web Search (DuckDuckGo)
-  * Unit Converter
-  * Time Tool
-* Connected tools with Research Agent
-* Enabled intelligent tool selection
-* Added error handling
+### 🧠 Persistent Neural Core Memory (Vector DB RAG)
+Traditional bots forget facts when you start a new chat. This system uses a **FAISS Vector Database** to create permanent, long-term memory. If you tell the AI "I am a Python Developer," it stores this fact as a vector embedding. In every future chat session you ever create, the system searches this database and personalizes its answers based on your unique profile.
 
-✅ **Result:** Agent capable of solving real-world problems
+### 🛠️ Live External Tools
+The AI is not limited to its training data. The **Research Agent** operates on a ReAct (Reason + Act) framework and autonomously decides when to use its arsenal of 5 custom Python tools:
+1.  🌐 **Web Search (DuckDuckGo):** Uses the `duckduckgo-search` library to scrape the live internet for news, real-time facts, and current events. It fetches and reads the top 8 search results instantly.
+2.  🧮 **Advanced Calculator (SymPy):** Goes far beyond simple arithmetic. Uses Python's `SymPy` library to solve complex algebra, quadratic equations, and even calculus integrals safely.
+3.  🌦️ **Weather API (OpenWeatherMap):** Uses the OpenWeatherMap API to fetch real-time global weather data, returning precise temperatures, humidity, wind speeds, and current conditions for any city.
+4.  ⏳ **Global Time Zone Tracker:** Uses API timezone offsets to accurately fetch the exact current local time, date, and UTC offset for any city or country in the world.
+5.  📏 **Unit Converter:** A custom Regex-based tool that instantly converts physical units (Kilometers ↔ Meters, Celsius ↔ Fahrenheit, Kilograms ↔ Grams).
 
----
-
-## 🔹 Milestone 3: Multi-Agent System & Memory
-
-* Designed 16 specialized agents
-* Implemented:
-
-  * Research Agent
-  * Analysis Agent
-  * Summarizer Agent
-  * Content, Evaluator, Optimizer Agents
-* Added memory:
-
-  * Short-term (conversation)
-  * Long-term (FAISS vector DB)
-* Enabled agent collaboration
-
-✅ **Result:** Context-aware multi-agent system
+### 📌 Dashboard & Workspace Management
+*   **Workspaces:** Every chat is saved as an isolated workspace in a SQLite database.
+*   **Search History:** A dedicated page allows you to search through all past conversations instantly using AJAX.
+*   **Pin Messages:** Save the AI's most important answers to a permanent side panel so you never lose critical code or information.
+*   **Analytics:** An admin dashboard tracking system performance, average response times, and an exact breakdown of which AI agents are being used the most.
 
 ---
 
-## 🔹 Milestone 4: Full System Integration
+## 🧠 3. Deep Dive: The Orchestration Architecture (Advanced)
 
-* Developed orchestration pipelines:
+If you look under the hood, here is exactly how the framework processes a message:
 
-  * SIMPLE
-  * TOOL
-  * CONTENT
-  * COMPLEX
-* Built Flask APIs (`/chat`, `/search_history`, etc.)
-* Developed full frontend dashboard
-* Added features:
+### 🤖 The 16 Specialized Agents
+Instead of relying on one generic LLM prompt, the system delegates tasks to a massive roster of 16 highly specialized AI agents:
+*   **Routing Agents (2):** `Router Agent` (Top-level pipeline supervisor) & `UseCase Router` (Domain-specific supervisor).
+*   **Research & Analysis (3):** `Research Agent` (Autonomous tool execution), `Analysis Agent` (Deep logical reasoning), & `General Agent` (Data synthesis).
+*   **Domain Experts (4):** `Medical Agent` (Health data), `Debug Agent` (Code fixing), `Shopping Agent` (Product comparison), & `Decision Agent` (Pros/cons analysis).
+*   **Content Creators (2):** `Content Agent` (Essays, creative writing) & `Email Agent` (Professional formatting).
+*   **Quality Assurance & Output (5):** `Evaluator Agent` & `Optimizer Agent` (Content drafting loop), `Confidence Agent` & `Refinement Agent` (Final accuracy verification), and the `Summarizer Agent` (Markdown formatting).
 
-  * Workspace management
-  * Chat pinning
-  * Search history (AJAX)
-  * File upload
-  * Voice input
-  * Analytics
+### Step 1: Lightning-Fast Pre-Routing
+Before wasting money or time asking the LLM what to do, the system runs a fast Regex check. If it sees a pattern like "What's the weather", it instantly bypasses heavy processing and equips the Weather tool. This preserves extreme speed.
 
-✅ **Result:** Complete AI orchestration platform
+### Step 2: The AI Router Agent
+If the regex can't figure it out, the prompt goes to the **Router Agent**. The Router classifies the query into one of **Four Execution Pipelines**:
 
----
+1.  ⚡ **[SIMPLE] Pipeline:** Bypasses all agents and hits the LLM directly. Used for basic facts and "hellos" for maximum speed.
+2.  🧰 **[TOOL] Pipeline:** Triggers the **Research Agent** (using a ReAct framework). The agent autonomously decides whether it needs to use the Calculator, Web Search, or Weather API to find the answer.
+3.  ✍️ **[CONTENT] Pipeline:** Enters a cyclical Quality Assurance (QA) loop. The **Content Agent** drafts an email/essay. It passes the draft to the **Evaluator Agent**, who grades it. If it fails, the **Optimizer Agent** rewrites it until it is perfectly professional.
+4.  🏥 **[COMPLEX] Pipeline:** Hits a second router called the **UseCase Router**. It categorizes the prompt into domains:
+    *   *Medical Agent:* Formats health data and forces doctor disclaimers.
+    *   *Debug/Shopping/Decision Agents:* Searches the web to compare products, map out pros/cons, or fix code bugs.
 
-# 🌟 Unique Dashboard Features
-
-* 📌 **Pin Messages:** Save important responses
-* ⚡ **Quick Prompt Routing:** Fast query classification
-* 📚 **Full History & Search:** Search past chats instantly
-* 📊 **Analytics Dashboard:** Track system performance
-* 🧠 **Neural Core Memory:** Persistent user context
+### Step 3: Output Generation
+Before you see the text on your screen, the **Summarizer Agent** takes the chaotic research data and formats it beautifully in Markdown. Finally, a **Confidence Agent** does a last check to ensure the answer is highly accurate.
 
 ---
 
-# 🏗️ AI Orchestration Workflow
+## 🛠️ 4. Tech Stack
 
-## 🔄 Step-by-Step Execution
-
-### 1. Gateway & Workspace
-
-* Loads user sessions, chats, pinned data
-* Extracts text from uploaded files
-
----
-
-### 2. Fast Pre-Routing (Regex)
-
-* Detects simple/tool queries instantly
-* Skips heavy processing for speed
+*   **Backend:** Python, Flask, Gunicorn
+*   **AI Engine:** LangChain, Groq API (`llama-3.1-8b-instant`)
+*   **Memory & Databases:** SQLite (Users, Chats, Analytics), FAISS (Vector DB for RAG memory)
+*   **Frontend UI:** HTML5, Vanilla CSS, JavaScript (AJAX)
+*   **Document Parsers:** `pypdf`, `python-docx`, `pandas`, `openpyxl`, `python-pptx`
 
 ---
 
-### 3. AI Router
+## 💻 5. Local Installation & Setup
 
-* Classifies queries into:
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/your-username/Agent-Orchestration-Framework-with-LangChain.git
+   cd Agent-Orchestration-Framework-with-LangChain
+   ```
 
-  * SIMPLE
-  * TOOL
-  * CONTENT
-  * COMPLEX
+2. **Create a virtual environment:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows use: venv\Scripts\activate
+   ```
 
----
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### 4. Pipeline Execution
+4. **Set up Environment Variables:**
+   Create a `.env` file in the root directory and add your API keys:
+   ```env
+   GROQ_API_KEY=your_groq_api_key
+   OPENWEATHER_API_KEY=your_openweather_api_key
+   ```
 
-#### ⚡ SIMPLE
-
-* Direct LLM response
-* Fast and efficient
-
-#### 🛠️ TOOL
-
-* Research Agent uses tools:
-
-  * Calculator
-  * Weather
-  * Web Search
-
-#### ✍️ CONTENT
-
-* Content → Evaluation → Optimization loop
-
-#### 🧠 COMPLEX
-
-* UseCase Router activates domain agents:
-
-  * Medical
-  * Debug
-  * Shopping
-  * Decision
+5. **Run the Application:**
+   ```bash
+   python app.py
+   ```
+   Open your browser and navigate to `http://127.0.0.1:5000`
 
 ---
 
-### 5. Output & Memory
+## ☁️ 6. Deployment (Docker & Hugging Face Spaces)
 
-* Summarizer formats response
-* Confidence agent validates output
-* Data saved in:
+This project is fully containerized and optimized for deployment on **Hugging Face Spaces**.
 
-  * Memory (LangChain)
-  * Database (SQLite)
+A `Dockerfile` is included that:
+*   Exposes the app on Port `7860` via Gunicorn.
+*   Modifies folder permissions (`chmod 777`) so the FAISS Vector Database and SQLite database remain persistent and writeable by the cloud's non-root user.
 
----
-
-# 🧠 System Components
-
-## 🤖 LLM
-
-* Model: `llama-3.1-8b-instant` (Groq)
+**To Deploy for free:**
+1. Create a new "Docker Space" on Hugging Face.
+2. Select "MIT License" from the dropdown.
+3. Upload all project files directly to the Space.
+4. The Space will automatically build the Docker image and host your Agent Orchestration platform securely.
 
 ---
 
-## 🧰 Tools (5)
+## 🔮 7. Future Scope
 
-* Calculator (SymPy)
-* Weather API
-* Web Search
-* Unit Converter
-* Time
-
----
-
-## 🧩 Agents (16 Total)
-
-* Routing Agents
-* Research Agent
-* Domain Agents
-* Content & QA Agents
+While the current version uses standard LangChain agent chains, future iterations plan to:
+*   Integrate **LangGraph** for highly complex, stateful, cyclical graph-based execution.
+*   Implement Semantic Chunking for even more advanced Document RAG retrieval.
+*   Deploy on scalable cloud infrastructure with parallel async agent execution.
 
 ---
 
-# ⚡ Key Features
+## 📄 8. License
 
-* Multi-agent architecture
-* Tool-based reasoning
-* Context-aware memory
-* Real-time UI interaction (AJAX)
-* File processing system
-* Voice input
-
----
-
-# ⚠️ Limitations
-
-* Slight delay due to multiple agents
-* Dependency on external APIs
-* Rule-based routing can be improved
-
----
-
-# 🔮 Future Scope
-
-* LangGraph integration
-* Parallel agent execution
-* Cloud deployment
-* More domain-specific agents
-* Real-time streaming
-
----
-
-# 🏁 Conclusion
-
-OrchestAI demonstrates the evolution from a chatbot to a **multi-agent intelligent system** capable of handling complex real-world workflows using orchestration, tools, and memory.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
